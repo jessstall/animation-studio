@@ -1,5 +1,5 @@
 // Export: renders every frame at full size, then encodes transparent video with ffmpeg (WebAssembly).
-import { renderFrame, imagesReady } from './render.js';
+import { renderFrame, imagesReady, pendingImages, bumpFonts } from './render.js';
 import { ensureFonts } from './fonts.js';
 import { totalDuration } from './model.js';
 import { makeZip } from './zip.js';
@@ -50,6 +50,13 @@ export async function exportProject(project, opts) {
   onStatus('Preparing fonts and images…');
   await ensureFonts(project);
   await imagesReady(project);
+  // warm-up: draw a few frames small so custom effects request everything they use, then wait for it
+  if (project.layers.some(l => l.type === 'code')) {
+    const wc = document.createElement('canvas'); wc.width = Math.round(project.width * 0.2); wc.height = Math.round(project.height * 0.2);
+    const tot = totalDuration(project);
+    for (let i = 0; i <= 12; i++) { try { renderFrame(wc.getContext('2d'), project, tot * i / 12, { scale: 0.2 }); } catch { } }
+    await pendingImages(); await ensureFonts(project); bumpFonts();
+  }
 
   let ff = null;
   if (needFF) ff = await getFFmpeg(onStatus);

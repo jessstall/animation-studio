@@ -40,6 +40,7 @@ Craft:
 - Make it beautiful: generous size and spacing, centred composition, smooth easing (outCubic, inOutSine, outExpo), soft light, layered glow, subtle motion. Avoid hard flashes, harsh colours and fast jitter unless asked.
 - If the description includes words/lettering to show, use exactly those words; if it says "the lettering" without words, use "Will and the Way". If it says "the symbol" without naming one, use 'will-and-the-way-mark'.
 - Suggest section lengths that fit (intro usually 2–6 s for a story like this; mid 2–4 s; outro 1–3 s).
+- Size and place everything relative to the frame (e.g. const u = Math.min(lib.W, lib.H) / 1080; fontSize = 110 * u; positions from lib.cx / lib.cy / lib.W / lib.H) so the effect also works in square or landscape.
 - Keep the code efficient: it runs 30 times a second. Cache expensive work with lib.points / lib.shatter keys; don't create canvases yourself.
 
 When asked to revise an existing effect, change what was asked and keep everything else the same.

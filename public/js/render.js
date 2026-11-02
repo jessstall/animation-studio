@@ -52,6 +52,13 @@ export function getImage(src) {
   }
   return e.ok ? e.img : null;
 }
+// wait for any image that has been requested but not loaded yet (e.g. symbols a custom effect asked for)
+export function pendingImages() {
+  return Promise.all([...imgCache.values()].filter(e => !e.ok && !e.failed).map(e => new Promise(res => {
+    e.img.addEventListener('load', res, { once: true }); e.img.addEventListener('error', () => { e.failed = true; res(); }, { once: true });
+    setTimeout(res, 8000);
+  })));
+}
 export function imagesReady(project) {
   const srcs = [...project.layers.filter(l => l.type === 'image').map(l => l.src), ...project.layers.filter(l => l.type === 'code').flatMap(effectSymbols)];
   return Promise.all(srcs.map(src => new Promise(res => {
