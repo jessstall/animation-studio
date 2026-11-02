@@ -373,6 +373,7 @@ function drawContentRest(lx, layer, S, baseTransform) {
   for (const u of units) drawUnit(lx, layer, u, { ...REST }, S * (layer.scale || 1), PRESET.none);
 }
 
+let maskScratch = null;
 function drawUnit(c, layer, u, st, effScale, preset) {
   const b = u.bbox;
   c.save();
@@ -383,7 +384,7 @@ function drawUnit(c, layer, u, st, effScale, preset) {
   c.scale(st.s * st.sx, st.s * st.sy);
   c.translate(-b.cx, -b.cy);
   c.globalAlpha = clamp(st.o);
-  withBlur(c, st.b * effScale, (x) => {
+  const content = (x) => withBlur(x, st.b * effScale, (x) => {
     if (layer.type === 'image') {
       const img = getImage(layer.src);
       if (img) x.drawImage(tinted(img, layer.tint), b.x, b.y, b.w, b.h);
@@ -392,34 +393,45 @@ function drawUnit(c, layer, u, st, effScale, preset) {
       for (const s of u.segs) { x.font = fontStr(s.run); x.fillStyle = s.run.color; x.fillText(s.text, s.x, s.y); }
     }
   });
-  // soft-edged wipe / radial reveal: erase what is not yet revealed
-  if (st.wipe < 0.999 || st.radial < 0.999) {
-    c.globalAlpha = 1;
-    c.globalCompositeOperation = 'destination-out';
-    const pad = Math.max(b.w, b.h) * 0.6 + 40;
-    if (st.wipe < 0.999) {
-      const dir = preset.wipeDir || 'right';
-      const f = Math.max(14, (dir === 'up' ? b.h : b.w) * 0.12);
-      let g;
-      if (dir === 'up') {
-        const edge = b.y + b.h + f - (b.h + 2 * f) * st.wipe;
-        g = c.createLinearGradient(0, edge + f, 0, edge - f);
-      } else {
-        const edge = b.x - f + (b.w + 2 * f) * st.wipe;
-        g = c.createLinearGradient(edge - f, 0, edge + f, 0);
-      }
-      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
-      c.fillStyle = g; c.fillRect(b.x - pad, b.y - pad, b.w + 2 * pad, b.h + 2 * pad);
-    }
-    if (st.radial < 0.999) {
-      const R = Math.hypot(b.w, b.h) / 2, f = Math.max(16, R * 0.18);
-      const edge = (R + f) * st.radial;
-      const g = c.createRadialGradient(b.cx, b.cy, Math.max(0, edge - f), b.cx, b.cy, edge + f);
-      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
-      c.fillStyle = g; c.fillRect(b.x - pad, b.y - pad, b.w + 2 * pad, b.h + 2 * pad);
-    }
-    c.globalCompositeOperation = 'source-over';
+  const masking = st.wipe < 0.999 || st.radial < 0.999;
+  if (!masking) { content(c); c.restore(); return; }
+
+  // Soft-edged wipe / radial reveal. Drawn on its own scratch canvas so the mask
+  // only ever touches this unit, never the letters or lines around it.
+  const W = c.canvas.width, H = c.canvas.height;
+  const m = c.getTransform();
+  const pad = Math.max(b.w, b.h) * 0.25 + 30 + st.b * 2;
+  const pts = [[b.x - pad, b.y - pad], [b.x + b.w + pad, b.y - pad], [b.x + b.w + pad, b.y + b.h + pad], [b.x - pad, b.y + b.h + pad]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+  const dx0 = Math.max(0, Math.floor(Math.min(...pts.map(p => p[0])))), dy0 = Math.max(0, Math.floor(Math.min(...pts.map(p => p[1]))));
+  const dx1 = Math.min(W, Math.ceil(Math.max(...pts.map(p => p[0])))), dy1 = Math.min(H, Math.ceil(Math.max(...pts.map(p => p[1]))));
+  if (dx1 <= dx0 || dy1 <= dy0) { c.restore(); return; }
+  if (!maskScratch) maskScratch = document.createElement('canvas');
+  if (maskScratch.width < W || maskScratch.height < H) { maskScratch.width = Math.max(W, maskScratch.width); maskScratch.height = Math.max(H, maskScratch.height); }
+  const x = maskScratch.getContext('2d');
+  x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
+  x.clearRect(dx0, dy0, dx1 - dx0, dy1 - dy0);
+  x.setTransform(m);
+  content(x);
+  x.globalCompositeOperation = 'destination-out';
+  if (st.wipe < 0.999) {
+    const dir = preset.wipeDir || 'right';
+    const f = Math.max(10, (dir === 'up' ? b.h : b.w) * 0.18);
+    let g;
+    if (dir === 'up') { const edge = b.y + b.h + f - (b.h + 2 * f) * st.wipe; g = x.createLinearGradient(0, edge + f, 0, edge - f); }
+    else { const edge = b.x - f + (b.w + 2 * f) * st.wipe; g = x.createLinearGradient(edge - f, 0, edge + f, 0); }
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
+    x.fillStyle = g; x.fillRect(b.x - pad, b.y - pad, b.w + 2 * pad, b.h + 2 * pad);
   }
+  if (st.radial < 0.999) {
+    const R = Math.hypot(b.w, b.h) / 2, f = Math.max(16, R * 0.18);
+    const edge = (R + f) * st.radial;
+    const g = x.createRadialGradient(b.cx, b.cy, Math.max(0, edge - f), b.cx, b.cy, edge + f);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
+    x.fillStyle = g; x.fillRect(b.x - pad, b.y - pad, b.w + 2 * pad, b.h + 2 * pad);
+  }
+  x.globalCompositeOperation = 'source-over';
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.drawImage(maskScratch, dx0, dy0, dx1 - dx0, dy1 - dy0, dx0, dy0, dx1 - dx0, dy1 - dy0);
   c.restore();
 }
 

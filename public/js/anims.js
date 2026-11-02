@@ -96,6 +96,7 @@ export const MIDS = [
   { id: 'glow', name: 'Glow', period: 3, amount: 1, color: '#FFE7A8' },
   { id: 'shimmer', name: 'Shimmer sweep', period: 3, amount: 1, color: '#FFF6DC' },
   { id: 'flicker', name: 'Candle flicker', period: 1, amount: 1 },
+  { id: 'shake', name: 'Shake', period: 0.5, amount: 1 },
   { id: 'rotate', name: 'Slow turn', period: 30, amount: 1 },
 ];
 export const MID = Object.fromEntries(MIDS.map(m => [m.id, m]));
@@ -179,6 +180,7 @@ export function midState(mid, tau, unitIdx = 0, unitCount = 1) {
     case 'shimmer': out.shimmer = ((tau % P) / P); break;
     case 'flicker': out.o = 1 - 0.08 * amt * (0.5 + 0.5 * Math.sin(ph * 3.1) * Math.sin(ph * 1.7 + 1)); break;
     case 'rotate': out.r = (tau / P) * 360 * (amt >= 0 ? 1 : -1); break;
+    case 'shake': { const k = tau * (12 / P); out.x = 7 * amt * (Math.sin(k * 5.1) * 0.6 + Math.sin(k * 8.7 + 1.3) * 0.4); out.y = 5 * amt * (Math.sin(k * 6.3 + 2.1) * 0.6 + Math.sin(k * 9.9) * 0.4); out.r = 0.9 * amt * Math.sin(k * 7.4 + 0.7); break; }
   }
   return out;
 }
