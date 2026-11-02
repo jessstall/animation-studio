@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Animation Studio</title>
 <link rel="icon" href="icons/icon-32.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -57,6 +57,7 @@
       <select id="suggestTarget"><option value="selected">Selected layer</option><option value="all">All layers</option></select>
       <button class="gold" id="suggestBtn">Suggest</button>
     </form>
+    <div class="viewer" id="viewer">
     <div id="stage" class="stage">
       <div id="canvasWrap" class="canvaswrap">
         <canvas id="view"></canvas>
@@ -73,6 +74,8 @@
       <div class="bgseg seg" id="bgSeg" title="Preview background (not exported)">
         <button data-bg="checker" class="on">▦</button><button data-bg="dark">●</button><button data-bg="light">○</button><button data-bg="image" title="Use a still from your video">Still…</button>
       </div>
+    </div>
+    <nav class="mtabs" id="mtabs"><button data-m="layers">Layers</button><button data-m="symbols">Symbols</button><button data-m="edit">Edit</button><button data-m="timing">Timing</button></nav>
     </div>
     <div class="timeline" id="timeline">
       <div class="tl-head">

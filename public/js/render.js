@@ -12,6 +12,29 @@ export function setAssetListener(fn) { onAsset = fn; }
 export function bumpFonts() { fontVersion++; layoutCache.clear(); unitCache.clear(); restCache.clear(); }
 
 const mctx = document.createElement('canvas').getContext('2d');
+
+// Blur: native canvas filter where available (Chrome, Firefox); Safari gets a scaled-down/up soft blur instead.
+const FILTER_OK = !location.search.includes('safariblur') && (() => { try { const x = document.createElement('canvas').getContext('2d'); if (!('filter' in x)) return false; x.filter = 'blur(2px)'; return x.filter === 'blur(2px)'; } catch { return false; } })();
+let blurScratch = null;
+function withBlur(c, px, draw) {
+  if (!(px > 0.25)) { draw(c); return; }
+  if (FILTER_OK) { c.filter = `blur(${px.toFixed(2)}px)`; draw(c); c.filter = 'none'; return; }
+  const k = Math.min(24, Math.max(1.5, px / 1.2));
+  const W = c.canvas.width, H = c.canvas.height;
+  const sw = Math.max(1, Math.ceil(W / k)), sh = Math.max(1, Math.ceil(H / k));
+  if (!blurScratch) blurScratch = document.createElement('canvas');
+  if (blurScratch.width < sw || blurScratch.height < sh) { blurScratch.width = Math.max(sw, blurScratch.width); blurScratch.height = Math.max(sh, blurScratch.height); }
+  const x = blurScratch.getContext('2d');
+  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, sw + 2, sh + 2);
+  const m = c.getTransform();
+  x.setTransform(m.a / k, m.b / k, m.c / k, m.d / k, m.e / k, m.f / k);
+  x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+  draw(x);
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+  c.drawImage(blurScratch, 0, 0, sw, sh, 0, 0, sw * k, sh * k);
+  c.restore();
+}
 export const fontStr = r => `${r.italic ? 'italic ' : ''}${r.weight || 400} ${r.size}px "${r.font}", "Cormorant Garamond", serif`;
 
 // ---------- images ----------
@@ -217,6 +240,7 @@ const mixHex = (hex, toWhite) => {
 
 // ---------- main entry ----------
 // ctx canvas must be project.width*scale x project.height*scale
+export const nativeBlur = FILTER_OK;
 export function renderFrame(ctx, project, t, { scale = 1, background = false } = {}) {
   const W = Math.round(project.width * scale), H = Math.round(project.height * scale);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -359,15 +383,15 @@ function drawUnit(c, layer, u, st, effScale, preset) {
   c.scale(st.s * st.sx, st.s * st.sy);
   c.translate(-b.cx, -b.cy);
   c.globalAlpha = clamp(st.o);
-  if (st.b > 0.25) c.filter = `blur(${(st.b * effScale).toFixed(2)}px)`;
-  if (layer.type === 'image') {
-    const img = getImage(layer.src);
-    if (img) c.drawImage(tinted(img, layer.tint), b.x, b.y, b.w, b.h);
-  } else {
-    c.textBaseline = 'alphabetic';
-    for (const s of u.segs) { c.font = fontStr(s.run); c.fillStyle = s.run.color; c.fillText(s.text, s.x, s.y); }
-  }
-  c.filter = 'none';
+  withBlur(c, st.b * effScale, (x) => {
+    if (layer.type === 'image') {
+      const img = getImage(layer.src);
+      if (img) x.drawImage(tinted(img, layer.tint), b.x, b.y, b.w, b.h);
+    } else {
+      x.textBaseline = 'alphabetic';
+      for (const s of u.segs) { x.font = fontStr(s.run); x.fillStyle = s.run.color; x.fillText(s.text, s.x, s.y); }
+    }
+  });
   // soft-edged wipe / radial reveal: erase what is not yet revealed
   if (st.wipe < 0.999 || st.radial < 0.999) {
     c.globalAlpha = 1;
@@ -407,7 +431,7 @@ function drawLights(c, lights, alpha, ls, tau, effScale, blur, t) {
     c.translate(rays.x || 0, rays.y || 0);
     c.scale(ls, ls);
     const soft = (rays.softness || 0) + blur;
-    if (soft > 0.25) c.filter = `blur(${(soft * effScale).toFixed(2)}px)`;
+    withBlur(c, soft * effScale, (c) => {
     const n = Math.round(rays.count), spread = clamp(rays.spread, 1, 360);
     const rot = (rays.direction || 0) + (rays.turn || 0) * t;
     const slot = spread >= 360 ? 360 / n : spread / Math.max(1, n);
@@ -425,12 +449,13 @@ function drawLights(c, lights, alpha, ls, tau, effScale, blur, t) {
       c.fillStyle = g;
       c.beginPath(); c.arc(0, 0, L, a0, a1); c.arc(0, 0, inner, a1, a0, true); c.closePath(); c.fill();
     }
+    });
     c.restore();
   }
   if (orb.on && orb.intensity > 0) {
     c.save();
     c.translate(orb.x || 0, orb.y || 0);
-    if (blur > 0.25) c.filter = `blur(${(blur * effScale).toFixed(2)}px)`;
+    withBlur(c, blur * effScale, (c) => {
     const R = orb.size * ls, I = orb.intensity * alpha;
     const core = mixHex(orb.color, clamp(orb.core ?? 0.5));
     const g = c.createRadialGradient(0, 0, 0, 0, 0, R);
@@ -441,6 +466,7 @@ function drawLights(c, lights, alpha, ls, tau, effScale, blur, t) {
     g.addColorStop(0.65, hexA(orb.color, I * 0.1));
     g.addColorStop(1, hexA(orb.color, 0));
     c.fillStyle = g; c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.fill();
+    });
     c.restore();
   }
 }

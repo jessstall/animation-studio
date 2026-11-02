@@ -151,8 +151,8 @@ $('#layerList').addEventListener('dblclick', e => {
   const L = P.layers.find(l => l.id === li.dataset.id);
   const n = prompt('Layer name', L.name); if (n) { L.name = n; commit(); }
 });
-function select(id) { selId = id; renderLayerList(); renderInspector(); renderTimeline(); drawOverlay(); }
-function addLayer(L) { P.layers.push(L); selId = L.id; commit(); renderInspector(); }
+function select(id) { selId = id; renderLayerList(); renderInspector(); renderTimeline(); drawOverlay(); if (isPhone() && id) setMTab('edit'); }
+function addLayer(L) { P.layers.push(L); selId = L.id; commit(); renderInspector(); if (isPhone()) setMTab('edit'); }
 function duplicate(L) { const c = JSON.parse(JSON.stringify(L)); c.id = uid(); c.name = L.name + ' copy'; c.y += 40; const i = P.layers.indexOf(L); P.layers.splice(i + 1, 0, c); selId = c.id; commit(); renderInspector(); }
 function deleteLayer(id) { P.layers = P.layers.filter(l => l.id !== id); if (selId === id) selId = P.layers[P.layers.length - 1]?.id || null; commit(); renderInspector(); }
 
@@ -681,7 +681,7 @@ let exResults = [], exAbort = null;
 $('#exportBtn').onclick = () => {
   setPlaying(false);
   const s = segmentFrames(P);
-  $('#exInfo').textContent = `${P.width} × ${P.height}, ${P.fps} fps, ${totalDuration(P).toFixed(2)} s (${s.N} frames). Intro ${P.sections.intro} s · Mid ${P.sections.mid} s · Outro ${P.sections.outro} s. Exports are transparent; the preview background is not included.`;
+  $('#exInfo').textContent = `${P.width} × ${P.height}, ${P.fps} fps, ${totalDuration(P).toFixed(2)} s (${s.N} frames). Intro ${P.sections.intro} s · Mid ${P.sections.mid} s · Outro ${P.sections.outro} s. Exports are transparent; the preview background is not included.` + (isPhone() ? ' Exporting is best done on a computer: phones can run out of memory on longer animations.' : '');
   $('#exStatus').textContent = ''; $('#exResults').innerHTML = ''; $('#exProg').hidden = true; $('#exZip').hidden = true; $('#exGo').disabled = false;
   $('#exportDlg').showModal();
 };
@@ -775,6 +775,15 @@ document.addEventListener('keydown', e => {
     commit({ redrawUI: false }); syncPosInputs();
   }
 });
+
+// ---------------- phone tabs ----------------
+const isPhone = () => window.matchMedia('(max-width: 760px)').matches;
+function setMTab(m) {
+  document.body.dataset.m = m;
+  $$('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+}
+$('#mtabs').addEventListener('click', e => { const m = e.target.dataset.m; if (m) setMTab(m); });
+setMTab('edit');
 
 // ---------------- boot ----------------
 function refreshAll() { refreshHeader(); syncBg(); renderLayerList(); renderInspector(); renderTimeline(); fit(); ensureFonts(P).then(() => { bumpFonts(); draw(); renderTimeline(); }); }
