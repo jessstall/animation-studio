@@ -249,7 +249,6 @@ button { white-space: nowrap; }
   .dlg .cols { grid-template-columns: 1fr; }
   body:not([data-m="layers"]) #tab-layers, body:not([data-m="symbols"]) #tab-symbols { display: none !important; }
   body[data-m="layers"] #tab-layers, body[data-m="symbols"] #tab-symbols { display: block !important; }
-  body:not([data-m="layers"]):not([data-m="symbols"]) .left { display: none; }
   body:not([data-m="edit"]) .right, body:not([data-m="edit"]) .suggest { display: none; }
   body:not([data-m="timing"]) .timeline { display: none; }
   .insp-empty { padding: 24px 16px; }
@@ -259,3 +258,22 @@ button { white-space: nowrap; }
 .tbalign button { padding: 5px 8px; }
 
 .prompts { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+
+.effgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+.effgrid .eff { position: relative; border-radius: 8px; background: #26262c; border: 1px solid var(--line); cursor: pointer; overflow: hidden; }
+.effgrid .eff:hover { border-color: var(--gold); }
+.effgrid .eff img { display: block; width: 100%; aspect-ratio: 9/16; object-fit: cover; background: #2f3b48; }
+.effgrid .eff span { display: block; font-size: 11.5px; padding: 5px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.effgrid .eff .x { position: absolute; top: 4px; right: 4px; border: 0; background: rgba(0,0,0,.55); padding: 1px 6px; font-size: 11px; display: none; }
+.effgrid .eff:hover .x { display: block; }
+.params { display: flex; flex-direction: column; gap: 8px; }
+.params textarea { width: 100%; min-height: 40px; resize: vertical; }
+.tabs button { padding: 11px 4px; }
+@media (max-width: 760px) {
+  body:not([data-m="effects"]) #tab-effects { display: none !important; }
+  body[data-m="effects"] #tab-effects { display: block !important; }
+  body:not([data-m="layers"]):not([data-m="symbols"]):not([data-m="effects"]) .left { display: none; }
+  .effgrid { grid-template-columns: repeat(3, 1fr); }
+  .effgrid .eff .x { display: block; }
+  .mtabs button { font-size: 13px; padding: 11px 2px; }
+}

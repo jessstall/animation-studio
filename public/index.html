@@ -32,7 +32,7 @@
 
 <main class="app">
   <aside class="left panel">
-    <div class="tabs"><button data-tab="layers" class="on">Layers</button><button data-tab="symbols">Symbols</button></div>
+    <div class="tabs"><button data-tab="layers" class="on">Layers</button><button data-tab="symbols">Symbols</button><button data-tab="effects">Effects</button></div>
     <section id="tab-layers" class="tabbody">
       <div class="addrow">
         <button id="addText">+ Text</button><button id="addImage">+ Image</button><button id="addLight">+ Light</button>
@@ -47,6 +47,11 @@
       <div class="symgroup">Your symbols <button id="addSymbol" class="link">+ Add</button></div>
       <div id="userSymGrid" class="symgrid"></div>
       <p class="hint">Click a symbol to add it. Symbols you add here stay in this browser.</p>
+    </section>
+    <section id="tab-effects" class="tabbody" hidden>
+      <div class="symgroup">Your saved effects</div>
+      <div id="effectGrid" class="effgrid"></div>
+      <p class="hint">Save a custom effect from its settings panel (“Save to effects library”). Click one here to add it, then change its words and colours in its settings.</p>
     </section>
   </aside>
 
@@ -75,7 +80,7 @@
         <button data-bg="checker" class="on">▦</button><button data-bg="dark">●</button><button data-bg="light">○</button><button data-bg="image" title="Use a still from your video">Still…</button>
       </div>
     </div>
-    <nav class="mtabs" id="mtabs"><button data-m="layers">Layers</button><button data-m="symbols">Symbols</button><button data-m="edit">Edit</button><button data-m="timing">Timing</button></nav>
+    <nav class="mtabs" id="mtabs"><button data-m="layers">Layers</button><button data-m="symbols">Symbols</button><button data-m="effects">Effects</button><button data-m="edit">Edit</button><button data-m="timing">Timing</button></nav>
     </div>
     <div class="timeline" id="timeline">
       <div class="tl-head">

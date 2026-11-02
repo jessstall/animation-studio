@@ -11,7 +11,12 @@ You write a custom effect: the BODY of a JavaScript function called every frame 
 - Plain canvas drawing only: no DOM, no fetch, no images other than the toolkit's symbols, no async.
 - Always ctx.save()/ctx.restore() around changes to transform, alpha, shadow, composite mode.
 
+Editable words & settings (required): start the code with
+  const P = lib.params({ ...defaults... });
+and put EVERY piece of wording, the symbol name(s), and the 2–4 main colours in it, then use P.<name> everywhere (never hard-code words elsewhere). Jess reuses effects with different words, so the layout must adapt to the text: measure it with lib.measure and shrink the size to fit the frame width (about 86% of lib.W); split on '\n' to allow multiple lines. Use clear camelCase names, e.g. { title: 'Will and the Way', subtitle: '', symbol: 'will-and-the-way-mark', symbolColour: 'gold', lightColour: '#FFD98A', textColour: '#F6EFE3' } (symbol colours are 'gold' | 'white' | 'black'; other colours are '#RRGGBB'). Keep the same names when revising.
+
 Toolkit (lib):
+- lib.params(defaults) -> the defaults merged with what Jess has typed in (see above)
 - lib.W, lib.H, lib.cx, lib.cy, lib.T = {intro, mid, outro, total, midStart, outroStart}
 - lib.seg(t, a, b, ease?) -> 0..1 progress of t between a and b (ease name optional)
 - lib.ease.<name>(x): linear, inOutSine, inQuad, outQuad, inCubic, outCubic, inOutCubic, outQuart, inQuart, outExpo, inExpo, inOutExpo, outBack, inBack, outElastic, outBounce
@@ -56,9 +61,10 @@ export async function create(request, env) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
   const ctxInfo = `Frame: ${body.width} x ${body.height}. Current sections: ${JSON.stringify(body.sections)}.\nWill and the Way symbols available (use these names): ${(body.symbols || []).join(', ')}.\nOther layers in the animation (for context; your effect is drawn as its own layer): ${JSON.stringify(body.others || []).slice(0, 2000)}`;
-  let user;
+  let user; let ctxInfo2 = '';
+  if (body.current && body.current.params && Object.keys(body.current.params).length) ctxInfo2 = `\nJess's current values for the editable settings: ${JSON.stringify(body.current.params)}`;
   if (body.current && body.current.code) {
-    user = `${ctxInfo}\n\nThe current effect "${body.current.name}" was made from: ${JSON.stringify(body.current.prompts || [])}\nCurrent code:\n<code>\n${body.current.code}\n</code>\n\n` +
+    user = `${ctxInfo}\n\nThe current effect "${body.current.name}" was made from: ${JSON.stringify(body.current.prompts || [])}\nCurrent code:\n<code>\n${body.current.code}\n</code>${ctxInfo2}\n\n` +
       (body.error ? `It fails with this error, please fix it (keep the look): ${body.error}\n` : '') +
       (body.prompt ? `Change requested: ${body.prompt}` : '');
   } else {

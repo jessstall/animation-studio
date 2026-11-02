@@ -33,7 +33,7 @@ export async function ensureFonts(project) {
     requestFont(r.font);
     faces.add(`${r.italic ? 'italic ' : ''}${r.weight || 400} 64px "${r.font}"`);
   }
-  for (const l of project.layers) if (l.type === 'code') for (const f of effectFonts(l)) {
+  for (const l of project.layers) if (l.type === 'code') for (const f of [...effectFonts(l), ...Object.values({ ...(l.paramDefs || {}), ...(l.params || {}) }).filter(v => typeof v === 'string' && FONTS.some(x => x.name === v))]) {
     requestFont(f);
     for (const w of [300, 400, 500, 600, 700]) { faces.add(`${w} 64px "${f}"`); faces.add(`italic ${w} 64px "${f}"`); }
   }

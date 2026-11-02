@@ -88,13 +88,23 @@ function alphaBox(c) {
 }
 
 // ---------- the lib handed to each effect ----------
-export function makeLib(ctx, project, S) {
+export function makeLib(ctx, project, S, layer) {
   const W = project.width, H = project.height;
   const { intro, mid, outro } = project.sections;
   const total = intro + mid + outro;
+  const pk = layer ? layer.id + JSON.stringify(layer.params || {}) : '';
   const lib = {
     W, H, cx: W / 2, cy: H / 2,
     T: { intro, mid, outro, total, midStart: intro, outroStart: intro + mid },
+    // editable words & settings: const P = lib.params({ title: 'Will and the Way', colour: '#B8892A', ... })
+    params(defaults = {}) {
+      if (layer) {
+        const j = JSON.stringify(defaults);
+        if (layer._paramJSON !== j) { layer._paramJSON = j; layer.paramDefs = defaults; }
+        return { ...defaults, ...(layer.params || {}) };
+      }
+      return { ...defaults };
+    },
     ease: EASES, clamp, lerp, rand: (i) => rand(Math.floor(i * 1000) + 7), noise: (x, y) => y === undefined ? noise1(x) : noise2(x, y),
     // progress 0..1 of t between a and b, optionally eased
     seg(t, a, b, ease) { const p = clamp((t - a) / Math.max(1e-6, b - a)); return ease ? (EASES[ease] || EASES.outCubic)(p) : p; },
@@ -194,7 +204,7 @@ export function makeLib(ctx, project, S) {
     },
     // sample what drawFn draws into particle points: [{x,y,c:'r,g,b',a}], cached by key
     points(key, drawFn, step = 4) {
-      const k = key + '|' + step + '|' + W + 'x' + H + '|' + deps.fontVersion();
+      const k = pk + key + '|' + step + '|' + W + 'x' + H + '|' + deps.fontVersion();
       let pts = pointCache.get(k);
       if (!pts) {
         lib._missing = false;
@@ -256,7 +266,7 @@ export function makeLib(ctx, project, S) {
     // o: {pieces (2 = a clean split down the middle, more = shards), spread px, rotate (radians), crack (crack line colour while apart), jag}
     shatter(key, drawFn, p, o = {}) {
       const pieces = Math.max(2, o.pieces || 2);
-      const k = key + '|' + pieces + '|' + (o.jag ?? 1) + '|' + S + '|' + deps.fontVersion();
+      const k = pk + key + '|' + pieces + '|' + (o.jag ?? 1) + '|' + S + '|' + deps.fontVersion();
       let P = pieceCache.get(k);
       if (!P) {
         lib._missing = false;

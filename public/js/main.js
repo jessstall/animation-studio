@@ -1,5 +1,5 @@
 import { newProject, newTextLayer, newImageLayer, newLightLayer, newCodeLayer, SIZES, FONTS, totalDuration, uid, defaultLights } from './model.js';
-import { setSymbolIndex, symbolNames, compileEffect, effectError } from './codelib.js';
+import { setSymbolIndex, symbolNames, compileEffect, effectError, clearCodeCaches } from './codelib.js';
 import { PRESETS, PRESET, MIDS, MID, EASE_NAMES } from './anims.js';
 import { renderFrame, layerBounds, setAssetListener, phaseSpan, getImage, bumpFonts, imagesReady } from './render.js';
 import { requestFont, ensureFonts, loadUserFonts, addFontFile, userFamilies } from './fonts.js';
@@ -219,7 +219,8 @@ $('#fileSymbol').onchange = async e => {
 };
 $$('.tabs button').forEach(b => b.onclick = () => {
   $$('.tabs button').forEach(x => x.classList.toggle('on', x === b));
-  $('#tab-layers').hidden = b.dataset.tab !== 'layers'; $('#tab-symbols').hidden = b.dataset.tab !== 'symbols';
+  for (const t of ['layers', 'symbols', 'effects']) $('#tab-' + t).hidden = b.dataset.tab !== t;
+  if (b.dataset.tab === 'effects') renderEffects();
 });
 
 // drag & drop images onto the stage
@@ -402,7 +403,7 @@ const fmt = v => typeof v === 'number' ? (Math.abs(v) >= 100 || Number.isInteger
 function num(label, k, step = 1, extra = '') { return `<div class="row"><label>${label}</label><input type="number" data-k="${k}" step="${step}" value="${getPath(sel(), k)}" ${extra}></div>`; }
 function color(label, k) { return `<div class="row"><label>${label}</label><input type="color" data-k="${k}" value="${getPath(sel(), k) || '#ffffff'}"><span class="muted small">${getPath(sel(), k) || ''}</span></div>`; }
 function check(label, k) { return `<label class="chk"><input type="checkbox" data-k="${k}" ${getPath(sel(), k) ? 'checked' : ''}> ${label}</label>`; }
-function sec(id, title, body) { return `<details class="sec" data-sec="${id}" ${openSecs.has(id) ? 'open' : ''}><summary>${title}</summary><div class="body">${body}</div></details>`; }
+function sec(id, title, body) { return `<details class="sec" data-sec="${id}" ${openSecs.has(id) || id === 'effect' ? 'open' : ''}><summary>${title}</summary><div class="body">${body}</div></details>`; }
 
 const SWATCHES = ['#FFFFFF', '#F6EFE3', '#E8D3A3', '#C9A24F', '#B8862F', '#1B1B1B'];
 const WEIGHTS = [[100, 'Thin'], [200, 'Extra light'], [300, 'Light'], [400, 'Regular'], [500, 'Medium'], [600, 'Semibold'], [700, 'Bold'], [800, 'Extra bold'], [900, 'Black']];
@@ -549,7 +550,10 @@ function renderInspector() {
     const err = effectError(L);
     h += sec('effect', 'Custom effect', `
       ${err ? `<p class="warn">${esc(err)}</p><button class="ghost" id="fixEffect">Ask Claude to fix it</button>` : ''}
-      <div class="note">Made from:</div>
+      ${L.paramDefs && Object.keys(L.paramDefs).length ? `<div class="subhead">Words & settings</div><div class="params">${paramFields(L)}</div><button class="ghost" id="resetParams">Back to the original words & colours</button>`
+        : `<p class="note">The words in this effect are built into it.</p><button class="ghost" id="makeEditable">Make the words & colours editable</button>`}
+      <button class="ghost" id="saveEffect">Save to effects library</button>
+      <div class="note" style="margin-top:6px">Made from:</div>
       <ol class="prompts">${(L.prompts || []).map(p => `<li>${esc(p)}</li>`).join('') || '<li class="muted">(written by hand)</li>'}</ol>
       <p class="note">To change it, keep this layer selected, choose <b>Selected layer</b> next to the Suggest box, and describe the change, e.g. “make the gold light warmer and slower”.</p>
       <details><summary class="note" style="cursor:pointer">Code (advanced)</summary>
@@ -580,6 +584,22 @@ function renderInspector() {
   box.scrollTop = scroll;
   if (L.type === 'text') { const ed = $('#editor'); ed.style.textAlign = L.align || 'center'; renderEditor(ed, L); bindEditor(ed, L); }
   bindInspector(L);
+}
+
+function paramLabel(k) { return k.replace(/([a-z])([A-Z0-9])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/^./, c => c.toUpperCase()); }
+function paramFields(L) {
+  const vals = { ...L.paramDefs, ...(L.params || {}) };
+  return Object.entries(L.paramDefs).map(([k, def]) => {
+    const v = vals[k];
+    let input;
+    if (typeof def === 'number') input = `<input type="number" data-param="${k}" step="any" value="${v}">`;
+    else if (typeof def === 'boolean') input = `<input type="checkbox" data-param="${k}" ${v ? 'checked' : ''}>`;
+    else if (/symbol/i.test(k) && !/colou?r/i.test(k)) input = `<select data-param="${k}" class="grow">${symbolNames().map(n => `<option value="${n}" ${n === v ? 'selected' : ''}>${esc(symbols.find(s => s.file.includes('/' + n + '.'))?.name || n)}</option>`).join('')}</select>`;
+    else if (/colou?r/i.test(k) && ['gold', 'white', 'black'].includes(String(v))) input = `<select data-param="${k}">${['gold', 'white', 'black'].map(c => `<option ${c === v ? 'selected' : ''}>${c}</option>`).join('')}</select>`;
+    else if (/^#[0-9a-f]{6}$/i.test(String(def))) input = `<input type="color" data-param="${k}" value="${v}">`;
+    else input = `<textarea data-param="${k}" rows="${String(v).length > 28 || String(v).includes('\n') ? 2 : 1}">${esc(v)}</textarea>`;
+    return `<div class="row"><label>${esc(paramLabel(k))}</label>${input}</div>`;
+  }).join('');
 }
 
 function bindInspector(L) {
@@ -642,6 +662,20 @@ function bindInspector(L) {
   const sd = $('#shadowDefault'); if (sd) sd.onclick = () => { Object.assign(L.shadow, { on: true, color: '#000000', opacity: 0.4, blur: 30, x: 0, y: 0 }); commit(); renderInspector(); };
   const tOn = $('#tintOn'); if (tOn) tOn.onchange = () => { L.tint = tOn.checked ? '#C9A24F' : ''; commit(); renderInspector(); };
   box.querySelectorAll('[data-tint]').forEach(b => b.onclick = () => { L.tint = b.dataset.tint; commit(); renderInspector(); });
+  box.querySelectorAll('[data-param]').forEach(inp => {
+    const ev = inp.tagName === 'SELECT' || inp.type === 'checkbox' ? 'change' : 'input';
+    inp.addEventListener(ev, () => {
+      const def = L.paramDefs[inp.dataset.param];
+      let v = inp.type === 'checkbox' ? inp.checked : inp.value;
+      if (typeof def === 'number') { v = parseFloat(v); if (isNaN(v)) return; }
+      (L.params ||= {})[inp.dataset.param] = v;
+      if (typeof v === 'string' && FONTS.some(f => f.name === v)) requestFont(v);
+      commit({ redrawUI: false });
+    });
+  });
+  const rp = $('#resetParams'); if (rp) rp.onclick = () => { L.params = {}; commit(); renderInspector(); };
+  const me = $('#makeEditable'); if (me) me.onclick = () => runCreate('Move all the wording, the symbol choice and the main colours into const P = lib.params({...}) at the top so they can be edited, and make the layout adapt to different text. Do not change how it looks.', L);
+  const se = $('#saveEffect'); if (se) se.onclick = () => saveEffect(L);
   const ac = $('#applyCode'); if (ac) ac.onclick = () => { L.code = $('#effectCode').value; compileEffect(L); commit(); draw(); setTimeout(renderInspector, 50); };
   const fx = $('#fixEffect'); if (fx) fx.onclick = () => runCreate('', L, effectError(L));
   const rep = $('#replaceImg'); if (rep) rep.onclick = () => { const f = $('#fileImage'); f.dataset.replace = L.id; f.click(); };
@@ -857,7 +891,7 @@ async function runCreate(prompt, L, fixError) {
   const base = { width: P.width, height: P.height, sections: P.sections, symbols: symbolNames(), others: P.layers.filter(l => l !== L).map(l => ({ type: l.type, name: l.name, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')) : undefined })) };
   try {
     const progress = (txt) => { const lines = (txt.split('<code>')[1] || '').split('\n').length; toast(lines > 1 ? `Claude is writing your effect… ${lines} lines so far` : 'Claude is designing your effect…', 60000); };
-    let d = await callCreate({ ...base, prompt, current: L ? { code: L.code, name: L.name, prompts: L.prompts } : null, error: fixError || undefined }, progress);
+    let d = await callCreate({ ...base, prompt, current: L ? { code: L.code, name: L.name, prompts: L.prompts, params: L.params } : null, error: fixError || undefined }, progress);
     const target = L || newCodeLayer(P, d.name || 'Custom effect', '');
     const before = target.code;
     target.code = d.code;
@@ -866,7 +900,7 @@ async function runCreate(prompt, L, fixError) {
     let err = testEffect(target);
     if (err) { // one automatic repair attempt
       toast('Polishing a glitch in the effect…', 60000);
-      d = await callCreate({ ...base, prompt: '', current: { code: target.code, name: target.name, prompts: target.prompts }, error: err }, progress);
+      d = await callCreate({ ...base, prompt: '', current: { code: target.code, name: target.name, prompts: target.prompts, params: target.params }, error: err }, progress);
       target.code = d.code; await ensureFonts({ ...P, layers: [target] }); await imagesReady({ ...P, layers: [target] }); err = testEffect(target);
     }
     if (prompt) (target.prompts ||= []).push(prompt);
@@ -879,6 +913,37 @@ async function runCreate(prompt, L, fixError) {
   } catch (e) { toast(e.message, 7000); }
   creating = false; btn.disabled = false; btn.textContent = 'Suggest';
 }
+
+// ---------- effects library ----------
+async function effectThumb(L) {
+  const c = document.createElement('canvas'); const s = 200 / P.height;
+  c.width = Math.round(P.width * s); c.height = 200;
+  const x = c.getContext('2d'); x.fillStyle = '#2f3b48'; x.fillRect(0, 0, c.width, c.height);
+  const t = Math.min(totalDuration(P) - 0.01, P.sections.intro + Math.min(1, P.sections.mid / 2));
+  const tmp = document.createElement('canvas'); tmp.width = c.width; tmp.height = c.height;
+  try { renderFrame(tmp.getContext('2d'), { ...P, layers: [L] }, t, { scale: s }); } catch { }
+  x.drawImage(tmp, 0, 0);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+async function saveEffect(L) {
+  const name = prompt('Name for this effect in your library', L.name); if (!name) return;
+  await store.put('effects', { id: uid(), name, code: L.code, prompts: L.prompts || [], paramDefs: L.paramDefs || {}, params: { ...(L.params || {}) }, sections: { ...P.sections }, size: [P.width, P.height], thumb: await effectThumb(L), saved: Date.now() });
+  toast('Saved to your effects library (Effects tab).');
+}
+async function renderEffects() {
+  const list = (await store.all('effects').catch(() => [])).sort((a, b) => b.saved - a.saved);
+  $('#effectGrid').innerHTML = list.map(e => `<div class="eff" data-id="${e.id}" title="${esc((e.prompts || []).join(' → '))}"><img src="${e.thumb}" alt=""><span>${esc(e.name)}</span><button class="x" data-del="${e.id}">✕</button></div>`).join('') || '<p class="hint" style="grid-column:1/-1;margin:0">Nothing saved yet.</p>';
+}
+$('#effectGrid').addEventListener('click', async e => {
+  if (e.target.dataset.del) { if (confirm('Remove this effect from your library?')) { await store.del('effects', e.target.dataset.del); renderEffects(); } return; }
+  const d = e.target.closest('.eff'); if (!d) return;
+  const r = await store.get('effects', d.dataset.id);
+  const L = newCodeLayer(P, r.name, r.code); L.prompts = [...(r.prompts || [])]; L.params = { ...(r.params || {}) };
+  if (r.sections) P.sections = { ...r.sections };
+  addLayer(L); await ensureFonts(P); await imagesReady(P); bumpFonts(); renderInspector();
+  toast('Added. Its timing (intro, mid, outro) has been set to match the effect. Change its words in the settings panel.', 6000);
+  range = 'full'; syncRangeButtons(); playFromStart();
+});
 
 function deepMerge(a, b) { for (const k in b) { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) && a[k] && typeof a[k] === 'object') deepMerge(a[k], b[k]); else if (b[k] !== undefined) a[k] = b[k]; } return a; }
 function applySuggestion(d) {
@@ -935,7 +1000,7 @@ function setMTab(m) {
   document.body.dataset.m = m;
   $$('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
 }
-$('#mtabs').addEventListener('click', e => { const m = e.target.dataset.m; if (m) setMTab(m); });
+$('#mtabs').addEventListener('click', e => { const m = e.target.dataset.m; if (m) { setMTab(m); if (m === 'effects') renderEffects(); } });
 setMTab('edit');
 
 // ---------------- boot ----------------

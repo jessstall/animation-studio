@@ -285,7 +285,7 @@ function drawCodeLayer(ctx, layer, project, t, S, idx, W, H, strict, preview) {
     lx.setTransform(S, 0, 0, S, 0, 0);
     lx.translate(layer.x, layer.y); lx.rotate((layer.rotation || 0) * Math.PI / 180); lx.scale(layer.scale || 1, layer.scale || 1);
     lx.translate(-project.width / 2, -project.height / 2);
-    try { eff.fn(lx, t, makeLib(lx, project, S)); if (!eff.error) eff.ok = true; }
+    try { eff.fn(lx, t, makeLib(lx, project, S, layer)); if (!eff.error) eff.ok = true; }
     catch (e) { err = 'Error while playing: ' + e.message; setEffectError(layer, err); }
     lx.restore();
   }
