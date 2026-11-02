@@ -1,6 +1,7 @@
-import { newProject, newTextLayer, newImageLayer, newLightLayer, SIZES, FONTS, totalDuration, uid, defaultLights } from './model.js';
+import { newProject, newTextLayer, newImageLayer, newLightLayer, newCodeLayer, SIZES, FONTS, totalDuration, uid, defaultLights } from './model.js';
+import { setSymbolIndex, symbolNames, compileEffect, effectError } from './codelib.js';
 import { PRESETS, PRESET, MIDS, MID, EASE_NAMES } from './anims.js';
-import { renderFrame, layerBounds, setAssetListener, phaseSpan, getImage, bumpFonts } from './render.js';
+import { renderFrame, layerBounds, setAssetListener, phaseSpan, getImage, bumpFonts, imagesReady } from './render.js';
 import { requestFont, ensureFonts, loadUserFonts, addFontFile, userFamilies } from './fonts.js';
 import { renderEditor, parseEditor, getSelectionOffsets, setSelectionOffsets, applyStyle, styleAt } from './editor.js';
 import { exportProject, zipResults, segmentFrames, slug } from './export.js';
@@ -132,7 +133,7 @@ const previewOnce = (r) => { range = r; syncRangeButtons(); const [a] = rangeBou
 function renderLayerList() {
   const ul = $('#layerList');
   ul.innerHTML = [...P.layers].reverse().map(l => {
-    const icon = l.type === 'text' ? 'Aa' : l.type === 'light' ? '✺' : `<img src="${esc(l.src)}" style="${l.tint ? '' : ''}">`;
+    const icon = l.type === 'text' ? 'Aa' : l.type === 'light' ? '✺' : l.type === 'code' ? '✦' : `<img src="${esc(l.src)}" style="${l.tint ? '' : ''}">`;
     return `<li data-id="${l.id}" class="${l.id === selId ? 'sel' : ''} ${l.visible === false ? 'hidden' : ''}">
       <span class="ty">${icon}</span><span class="nm">${esc(l.name)}</span>
       <button data-act="vis" title="Show / hide">${l.visible === false ? '◌' : '●'}</button>
@@ -188,6 +189,7 @@ let symbols = [];
 let symColour = localStorage.getItem('as-symcol') || 'gold';
 async function loadSymbols() {
   try { symbols = await (await fetch('symbols/manifest.json')).json(); } catch { symbols = []; }
+  setSymbolIndex(symbols);
   renderSymbols();
   renderUserSymbols();
 }
@@ -235,8 +237,12 @@ stage.addEventListener('drop', async e => {
 // ---------------- canvas interaction ----------------
 function toProject(e) { const r = overlay.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * P.width, (e.clientY - r.top) / r.height * P.height]; }
 function hitTest(x, y) {
+  const hit = hitTest1(x, y, false);
+  return hit || hitTest1(x, y, true);
+}
+function hitTest1(x, y, codeLayers) {
   for (let i = P.layers.length - 1; i >= 0; i--) {
-    const L = P.layers[i]; if (L.visible === false) continue;
+    const L = P.layers[i]; if (L.visible === false || (L.type === 'code') !== codeLayers) continue;
     const b = layerBounds(L);
     const a = -(L.rotation || 0) * Math.PI / 180, dx = x - b.cx, dy = y - b.cy;
     const rx = dx * Math.cos(a) - dy * Math.sin(a), ry = dx * Math.sin(a) + dy * Math.cos(a);
@@ -539,6 +545,18 @@ function renderInspector() {
   if (!L) { box.innerHTML = `<div class="insp-empty"><p>Select a layer to edit it,<br>or add text, an image or a symbol.</p></div>`; return; }
   L.lights ||= defaultLights();
   let h = `<div class="sec" style="padding:12px 14px"><input id="layerName" value="${esc(L.name)}" style="width:100%;font-weight:600" title="Layer name"></div>`;
+  if (L.type === 'code') {
+    const err = effectError(L);
+    h += sec('effect', 'Custom effect', `
+      ${err ? `<p class="warn">${esc(err)}</p><button class="ghost" id="fixEffect">Ask Claude to fix it</button>` : ''}
+      <div class="note">Made from:</div>
+      <ol class="prompts">${(L.prompts || []).map(p => `<li>${esc(p)}</li>`).join('') || '<li class="muted">(written by hand)</li>'}</ol>
+      <p class="note">To change it, keep this layer selected, choose <b>Selected layer</b> next to the Suggest box, and describe the change, e.g. “make the gold light warmer and slower”.</p>
+      <details><summary class="note" style="cursor:pointer">Code (advanced)</summary>
+        <textarea id="effectCode" spellcheck="false" style="width:100%;height:260px;font:12px/1.4 ui-monospace,monospace;margin-top:8px">${esc(L.code)}</textarea>
+        <button class="ghost" id="applyCode" style="margin-top:6px">Apply code</button>
+      </details>`);
+  }
   if (L.type === 'text') h += sec('text', 'Text', textSection(L)) + sec('lines', 'Lines & spacing', linesSection(L));
   if (L.type === 'image') h += sec('image', 'Image', `
       ${slider('Width', 'width', 20, Math.max(P.width, P.height), 1)}
@@ -549,12 +567,13 @@ function renderInspector() {
       <div class="pair">${num('X', 'x')}${num('Y', 'y')}</div>
       <div class="row"><span class="lab">Centre</span><button class="ghost" id="cH">Horizontally</button><button class="ghost" id="cV">Vertically</button></div>
       ${slider('Scale', 'scale', 0.1, 4, 0.01)}${slider('Rotation °', 'rotation', -180, 180, 0.5)}${slider('Opacity', 'opacity', 0, 1, 0.01)}`);
+  if (L.type !== 'light' && L.type !== 'code') h += '';
   if (L.type !== 'light') h += sec('shadow', 'Drop shadow', `${check('Shadow', 'shadow.on')}
       ${L.shadow.on ? `${color('Colour', 'shadow.color')}${slider('Strength', 'shadow.opacity', 0, 1, 0.01)}${slider('Softness', 'shadow.blur', 0, 120, 1)}
       <div class="pair">${num('X', 'shadow.x')}${num('Y', 'shadow.y')}</div>
       <button class="ghost" id="shadowDefault">Reset to soft centred</button>` : ''}`);
-  h += sec('light', L.type === 'light' ? 'Light' : 'Light behind (orb & rays)', lightBody(L));
-  h += sec('animate', 'Animation', `<div class="subhead">Intro — coming in</div>${phaseBody(L, 'in')}
+  if (L.type !== 'code') h += sec('light', L.type === 'light' ? 'Light' : 'Light behind (orb & rays)', lightBody(L));
+  if (L.type !== 'code') h += sec('animate', 'Animation', `<div class="subhead">Intro — coming in</div>${phaseBody(L, 'in')}
       <div class="subhead">Mid section — the hold</div>${midBody(L)}
       <div class="subhead">Outro — going out</div>${phaseBody(L, 'out')}`);
   box.innerHTML = h;
@@ -623,6 +642,8 @@ function bindInspector(L) {
   const sd = $('#shadowDefault'); if (sd) sd.onclick = () => { Object.assign(L.shadow, { on: true, color: '#000000', opacity: 0.4, blur: 30, x: 0, y: 0 }); commit(); renderInspector(); };
   const tOn = $('#tintOn'); if (tOn) tOn.onchange = () => { L.tint = tOn.checked ? '#C9A24F' : ''; commit(); renderInspector(); };
   box.querySelectorAll('[data-tint]').forEach(b => b.onclick = () => { L.tint = b.dataset.tint; commit(); renderInspector(); });
+  const ac = $('#applyCode'); if (ac) ac.onclick = () => { L.code = $('#effectCode').value; compileEffect(L); commit(); draw(); setTimeout(renderInspector, 50); };
+  const fx = $('#fixEffect'); if (fx) fx.onclick = () => runCreate('', L, effectError(L));
   const rep = $('#replaceImg'); if (rep) rep.onclick = () => { const f = $('#fileImage'); f.dataset.replace = L.id; f.click(); };
 }
 // replace image via the same input
@@ -786,7 +807,9 @@ $('#suggestForm').onsubmit = async e => {
   e.preventDefault();
   const prompt = $('#suggestInput').value.trim(); if (!prompt) return;
   const target = $('#suggestTarget').value;
-  if (target === 'selected' && !sel()) return toast('Select a layer first, or choose “All layers”.');
+  if (target === 'new') return runCreate(prompt, null);
+  if (target === 'selected' && sel()?.type === 'code') return runCreate(prompt, sel());
+  if (target === 'selected' && !sel()) return toast('Select a layer first, or choose “All layers” or “New custom effect”.');
   const btn = $('#suggestBtn'); btn.disabled = true; btn.textContent = 'Thinking…';
   const summary = { sections: P.sections, layers: P.layers.map(l => ({ id: l.id, type: l.type, name: l.name, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')) : undefined, anim: l.anim, lights: l.lights })) };
   try {
@@ -801,6 +824,55 @@ $('#suggestForm').onsubmit = async e => {
   } catch (err) { toast(err.message, 6000); }
   btn.disabled = false; btn.textContent = 'Suggest';
 };
+// ---------- custom effects ----------
+let creating = false;
+function testEffect(L) {
+  const e = compileEffect(L);
+  if (e.error) return e.error;
+  const c = document.createElement('canvas'); c.width = Math.round(P.width * 0.25); c.height = Math.round(P.height * 0.25);
+  const x = c.getContext('2d');
+  const tot = totalDuration(P);
+  try { for (const t of [0, P.sections.intro * 0.5, P.sections.intro, P.sections.intro + P.sections.mid * 0.5, P.sections.intro + P.sections.mid + P.sections.outro * 0.5, tot - 0.01]) renderFrame(x, { ...P, layers: [L] }, t, { scale: 0.25, strict: true }); }
+  catch (err) { return err.message; }
+  return null;
+}
+async function callCreate(body) {
+  const r = await fetch('api/create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const ct = r.headers.get('content-type') || '';
+  if (!ct.includes('json')) throw new Error('Custom effects are not switched on yet (the studio needs to be published with the Anthropic API key).');
+  const d = await r.json(); if (d.error) throw new Error(d.error);
+  return d;
+}
+async function runCreate(prompt, L, fixError) {
+  if (creating) return;
+  creating = true;
+  const btn = $('#suggestBtn'); btn.disabled = true; btn.textContent = L ? 'Changing…' : 'Creating…';
+  toast(L ? (fixError ? 'Asking Claude to fix the effect… (up to a minute)' : 'Reworking your effect… (up to a minute)') : 'Claude is creating your effect… this can take up to a minute.', 60000);
+  const base = { width: P.width, height: P.height, sections: P.sections, symbols: symbolNames(), others: P.layers.filter(l => l !== L).map(l => ({ type: l.type, name: l.name, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')) : undefined })) };
+  try {
+    let d = await callCreate({ ...base, prompt, current: L ? { code: L.code, name: L.name, prompts: L.prompts } : null, error: fixError || undefined });
+    const target = L || newCodeLayer(P, d.name || 'Custom effect', '');
+    const before = target.code;
+    target.code = d.code;
+    if (d.sections && (!L || prompt)) for (const k of ['intro', 'mid', 'outro']) if (typeof d.sections[k] === 'number' && d.sections[k] > 0) P.sections[k] = Math.round(d.sections[k] * 100) / 100;
+    await ensureFonts({ ...P, layers: [target] }); await imagesReady({ ...P, layers: [target] }); bumpFonts();
+    let err = testEffect(target);
+    if (err) { // one automatic repair attempt
+      toast('Polishing a glitch in the effect…', 60000);
+      d = await callCreate({ ...base, prompt: '', current: { code: target.code, name: target.name, prompts: target.prompts }, error: err });
+      target.code = d.code; await ensureFonts({ ...P, layers: [target] }); await imagesReady({ ...P, layers: [target] }); err = testEffect(target);
+    }
+    if (prompt) (target.prompts ||= []).push(prompt);
+    if (!L) { if (d.name) target.name = d.name; P.layers.push(target); selId = target.id; }
+    commit(); renderInspector();
+    if (isPhone()) setMTab('edit');
+    $('#suggestTarget').value = 'selected';
+    toast(err ? 'The effect still has a problem: ' + err : (d.note || 'Done.') + ' Describe changes to keep refining it.', 7000);
+    range = 'full'; syncRangeButtons(); playFromStart();
+  } catch (e) { toast(e.message, 7000); }
+  creating = false; btn.disabled = false; btn.textContent = 'Suggest';
+}
+
 function deepMerge(a, b) { for (const k in b) { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) && a[k] && typeof a[k] === 'object') deepMerge(a[k], b[k]); else if (b[k] !== undefined) a[k] = b[k]; } return a; }
 function applySuggestion(d) {
   if (d.sections) for (const k of ['intro', 'mid', 'outro']) if (typeof d.sections[k] === 'number' && d.sections[k] >= 0) P.sections[k] = d.sections[k];

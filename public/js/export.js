@@ -61,7 +61,7 @@ export async function exportProject(project, opts) {
   const pngs = [];
   for (let f = 0; f < seg.N; f++) {
     if (opts.signal?.aborted) throw new Error('Export cancelled');
-    renderFrame(ctx, project, f / fps, { scale: 1 });
+    renderFrame(ctx, project, f / fps, { scale: 1, strict: true });
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const buf = new Uint8Array(await blob.arrayBuffer());
     if (ff) await ff.writeFile(`f${String(f).padStart(5, "0")}.png`, opts.formats.png ? buf.slice() : buf);

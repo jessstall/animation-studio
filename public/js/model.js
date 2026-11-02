@@ -57,6 +57,15 @@ export function newLightLayer(project) {
   };
 }
 
+export function newCodeLayer(project, name, code) {
+  const anim = defaultAnim('image'); anim.in.preset = 'none'; anim.out.preset = 'none';
+  return {
+    id: uid(), type: 'code', name: name || 'Custom effect', visible: true,
+    x: project.width / 2, y: project.height / 2, rotation: 0, scale: 1, opacity: 1,
+    code: code || '', prompts: [], shadow: { ...defaultShadow(), on: false }, lights: defaultLights(), anim,
+  };
+}
+
 export function newProject() {
   const p = {
     version: 1, id: uid(), name: 'Untitled animation',

@@ -257,3 +257,5 @@ button { white-space: nowrap; }
 
 .tbalign { margin-left: auto; }
 .tbalign button { padding: 5px 8px; }
+
+.prompts { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }

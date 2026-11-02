@@ -1,5 +1,6 @@
 // Rendering engine: lays out rich text, evaluates animations per unit and draws a frame.
 import { clamp, lerp, rand, EASES, PRESET, REST, phaseState, midState, orderIndex, easeFor } from './anims.js';
+import { makeLib, compileEffect, setCodeDeps, clearCodeCaches, setEffectError, effectSymbols } from './codelib.js';
 
 let fontVersion = 0;
 const layoutCache = new Map();
@@ -9,14 +10,14 @@ const tintCache = new Map();
 const restCache = new Map();
 let onAsset = () => {};
 export function setAssetListener(fn) { onAsset = fn; }
-export function bumpFonts() { fontVersion++; layoutCache.clear(); unitCache.clear(); restCache.clear(); }
+export function bumpFonts() { fontVersion++; layoutCache.clear(); unitCache.clear(); restCache.clear(); clearCodeCaches(); }
 
 const mctx = document.createElement('canvas').getContext('2d');
 
 // Blur: native canvas filter where available (Chrome, Firefox); Safari gets a scaled-down/up soft blur instead.
 const FILTER_OK = !location.search.includes('safariblur') && (() => { try { const x = document.createElement('canvas').getContext('2d'); if (!('filter' in x)) return false; x.filter = 'blur(2px)'; return x.filter === 'blur(2px)'; } catch { return false; } })();
 let blurScratch = null;
-function withBlur(c, px, draw) {
+export function withBlur(c, px, draw) {
   if (!(px > 0.25)) { draw(c); return; }
   if (FILTER_OK) { c.filter = `blur(${px.toFixed(2)}px)`; draw(c); c.filter = 'none'; return; }
   const k = Math.min(24, Math.max(1.5, px / 1.2));
@@ -52,8 +53,9 @@ export function getImage(src) {
   return e.ok ? e.img : null;
 }
 export function imagesReady(project) {
-  return Promise.all(project.layers.filter(l => l.type === 'image').map(l => new Promise(res => {
-    getImage(l.src); const e = imgCache.get(l.src);
+  const srcs = [...project.layers.filter(l => l.type === 'image').map(l => l.src), ...project.layers.filter(l => l.type === 'code').flatMap(effectSymbols)];
+  return Promise.all(srcs.map(src => new Promise(res => {
+    getImage(src); const e = imgCache.get(src);
     if (e.ok) return res();
     e.img.addEventListener('load', res, { once: true }); e.img.addEventListener('error', res, { once: true });
   })));
@@ -137,6 +139,7 @@ export function getUnits(layer, by) {
     const h = layer.width * (layer.natH || 1) / (layer.natW || 1);
     return [{ chars: [], line: 0, bbox: { x: -layer.width / 2, y: -h / 2, w: layer.width, h, cx: 0, cy: 0 } }];
   }
+  if (layer.type === 'code') return [{ chars: [], line: 0, bbox: { x: -540, y: -960, w: 1080, h: 1920, cx: 0, cy: 0 } }];
   if (layer.type === 'light') {
     const r = Math.max(layer.lights.orb.on ? layer.lights.orb.size : 0, layer.lights.rays.on ? layer.lights.rays.length : 0, 100);
     return [{ chars: [], line: 0, bbox: { x: -r, y: -r, w: 2 * r, h: 2 * r, cx: 0, cy: 0 } }];
@@ -184,6 +187,7 @@ export function layerBounds(layer) {
   let w, h;
   if (layer.type === 'text') { const L = layoutText(layer); w = L.width; h = L.height; }
   else if (layer.type === 'image') { w = layer.width; h = layer.width * (layer.natH || 1) / (layer.natW || 1); }
+  else if (layer.type === 'code') { w = layer.frameW || 1080; h = layer.frameH || 1920; }
   else { const r = Math.max(layer.lights.orb.on ? layer.lights.orb.size * 0.5 : 0, layer.lights.rays.on ? layer.lights.rays.length * 0.5 : 0, 60); w = h = r * 2; }
   const s = layer.scale || 1;
   return { cx: layer.x, cy: layer.y, w: w * s, h: h * s, x: layer.x - w * s / 2, y: layer.y - h * s / 2 };
@@ -241,12 +245,16 @@ const mixHex = (hex, toWhite) => {
 // ---------- main entry ----------
 // ctx canvas must be project.width*scale x project.height*scale
 export const nativeBlur = FILTER_OK;
-export function renderFrame(ctx, project, t, { scale = 1, background = false } = {}) {
+export function renderFrame(ctx, project, t, { scale = 1, background = false, strict = false } = {}) {
   const W = Math.round(project.width * scale), H = Math.round(project.height * scale);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, W, H);
   if (background) drawBackground(ctx, project, W, H);
-  project.layers.forEach((layer, i) => { if (layer.visible !== false) drawLayer(ctx, layer, project, t, scale, i, W, H); });
+  project.layers.forEach((layer, i) => {
+    if (layer.visible === false) return;
+    if (layer.type === 'code') drawCodeLayer(ctx, layer, project, t, scale, i, W, H, strict, background);
+    else drawLayer(ctx, layer, project, t, scale, i, W, H);
+  });
 }
 
 function drawBackground(ctx, project, W, H) {
@@ -257,6 +265,38 @@ function drawBackground(ctx, project, W, H) {
     const img = getImage(bg.image);
     if (img) { const s = Math.max(W / img.naturalWidth, H / img.naturalHeight); const w = img.naturalWidth * s, h = img.naturalHeight * s; ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h); }
   }
+}
+
+// ---------- custom effects (code layers) ----------
+function drawCodeLayer(ctx, layer, project, t, S, idx, W, H, strict, preview) {
+  layer.frameW = project.width; layer.frameH = project.height;
+  const eff = compileEffect(layer);
+  const [lc, lx] = layerCanvas(idx, W, H);
+  let err = eff.error;
+  if (eff.fn) {
+    lx.save();
+    lx.setTransform(S, 0, 0, S, 0, 0);
+    lx.translate(layer.x, layer.y); lx.rotate((layer.rotation || 0) * Math.PI / 180); lx.scale(layer.scale || 1, layer.scale || 1);
+    lx.translate(-project.width / 2, -project.height / 2);
+    try { eff.fn(lx, t, makeLib(lx, project, S)); if (!eff.error) eff.ok = true; }
+    catch (e) { err = 'Error while playing: ' + e.message; setEffectError(layer, err); }
+    lx.restore();
+  }
+  if (err) {
+    if (strict) throw new Error(`The custom effect "${layer.name}" has a problem: ${err}`);
+    if (preview) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = 'rgba(200,60,60,.85)'; ctx.font = `${Math.round(14 * S * 2)}px sans-serif`; ctx.fillText('⚠ ' + layer.name + ': ' + err.slice(0, 80), 10 * S, 30 * S * 2); ctx.restore(); }
+  }
+  const alpha = clamp(layer.opacity ?? 1);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const sh = layer.shadow;
+  if (sh && sh.on && sh.opacity > 0) {
+    const OFF = W * 4;
+    ctx.globalAlpha = alpha; ctx.shadowColor = hexA(sh.color, sh.opacity); ctx.shadowBlur = sh.blur * S;
+    ctx.shadowOffsetX = OFF + sh.x * S; ctx.shadowOffsetY = sh.y * S; ctx.drawImage(lc, -OFF, 0);
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+  }
+  ctx.globalAlpha = alpha; ctx.drawImage(lc, 0, 0);
+  ctx.restore();
 }
 
 function drawLayer(ctx, layer, project, t, scale, idx, W, H) {
@@ -622,3 +662,5 @@ export function drawBird(c, x, y, s, flap, heading = 0) {
   c.beginPath(); c.ellipse(0, s * 0.04, s * 0.06, s * 0.17, 0, 0, Math.PI * 2); c.fill();
   c.restore();
 }
+
+setCodeDeps({ getImage, fontStr, withBlur, fontVersion: () => fontVersion });

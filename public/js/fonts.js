@@ -2,6 +2,7 @@
 import { FONTS } from './model.js';
 import { all, put, del } from './storage.js';
 import { bumpFonts } from './render.js';
+import { effectFonts } from './codelib.js';
 
 const requested = new Set();
 export const userFonts = []; // {id, family, weight, style}
@@ -31,6 +32,10 @@ export async function ensureFonts(project) {
   for (const l of project.layers) if (l.type === 'text') for (const line of l.lines) for (const r of line.runs) {
     requestFont(r.font);
     faces.add(`${r.italic ? 'italic ' : ''}${r.weight || 400} 64px "${r.font}"`);
+  }
+  for (const l of project.layers) if (l.type === 'code') for (const f of effectFonts(l)) {
+    requestFont(f);
+    for (const w of [300, 400, 500, 600, 700]) { faces.add(`${w} 64px "${f}"`); faces.add(`italic ${w} 64px "${f}"`); }
   }
   // give stylesheets a moment to arrive, then load faces
   for (let i = 0; i < 30 && [...document.querySelectorAll('link[href*="fonts.googleapis"]')].some(l => !l.sheet); i++) await new Promise(r => setTimeout(r, 100));
