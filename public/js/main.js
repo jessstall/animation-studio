@@ -84,6 +84,12 @@ function drawOverlay() {
     octx.save(); octx.translate(b.cx, b.cy); octx.rotate((L.rotation || 0) * Math.PI / 180);
     octx.strokeStyle = 'rgba(226,194,122,.85)'; octx.lineWidth = lw * 1.2; octx.setLineDash([5 * lw, 4 * lw]);
     octx.strokeRect(-b.w / 2 - 6, -b.h / 2 - 6, b.w + 12, b.h + 12);
+    octx.setLineDash([]);
+    const hs = handleSize();
+    for (const [hx, hy] of corners(b)) {
+      octx.beginPath(); octx.arc(hx, hy, hs * (isPhone() ? 0.5 : 0.38), 0, Math.PI * 2);
+      octx.fillStyle = '#fff'; octx.fill(); octx.lineWidth = lw * 1.5; octx.strokeStyle = '#c9a24f'; octx.stroke();
+    }
     octx.restore();
   }
   octx.setLineDash([]);
@@ -240,9 +246,43 @@ function hitTest(x, y) {
   return null;
 }
 let drag = null;
+// resize handles (corners of the selection box), in the layer's own rotated frame
+const handleSize = () => 18 * P.width / overlay.getBoundingClientRect().width; // ~18 screen px
+const corners = b => [[-b.w / 2 - 6, -b.h / 2 - 6], [b.w / 2 + 6, -b.h / 2 - 6], [b.w / 2 + 6, b.h / 2 + 6], [-b.w / 2 - 6, b.h / 2 + 6]];
+function handleAt(x, y) {
+  const L = sel(); if (!L || L.visible === false) return null;
+  const b = layerBounds(L), a = -(L.rotation || 0) * Math.PI / 180;
+  const dx = x - b.cx, dy = y - b.cy;
+  const rx = dx * Math.cos(a) - dy * Math.sin(a), ry = dx * Math.sin(a) + dy * Math.cos(a);
+  const hs = handleSize() * (isPhone() ? 1.6 : 1);
+  const i = corners(b).findIndex(([hx, hy]) => Math.hypot(rx - hx, ry - hy) <= hs);
+  return i < 0 ? null : { L, i };
+}
+const pointers = new Map();
+let pinch = null;
+function setScale(L, v) {
+  L.scale = Math.max(0.05, Math.min(8, Math.round(v * 1000) / 1000));
+  draw(); syncScaleInput();
+}
+function syncScaleInput() {
+  const L = sel(); if (!L) return;
+  const r = $('[data-k="scale"]'); if (r) { r.value = L.scale; const v = $('[data-v="scale"]'); if (v) v.textContent = fmt(L.scale); }
+}
 overlay.addEventListener('pointerdown', e => {
   if (playing) setPlaying(false);
+  pointers.set(e.pointerId, toProject(e));
+  if (pointers.size === 2 && sel()) { // two-finger pinch to resize
+    const [p1, p2] = [...pointers.values()];
+    pinch = { L: sel(), d0: Math.hypot(p1[0] - p2[0], p1[1] - p2[1]) || 1, s0: sel().scale || 1 };
+    drag = null; overlay.setPointerCapture(e.pointerId); return;
+  }
   const [x, y] = toProject(e);
+  const h = handleAt(x, y);
+  if (h) {
+    const b = layerBounds(h.L);
+    drag = { L: h.L, resize: true, d0: Math.hypot(x - b.cx, y - b.cy) || 1, s0: h.L.scale || 1, cx: b.cx, cy: b.cy, moved: false };
+    overlay.setPointerCapture(e.pointerId); return;
+  }
   const L = hitTest(x, y);
   if (!L) { if (selId) { selId = null; renderLayerList(); renderInspector(); renderTimeline(); drawOverlay(); } return; }
   if (L.id !== selId) select(L.id);
@@ -251,8 +291,18 @@ overlay.addEventListener('pointerdown', e => {
 });
 overlay.addEventListener('pointermove', e => {
   const [x, y] = toProject(e);
-  overlay.style.cursor = drag ? 'grabbing' : hitTest(x, y) ? 'grab' : 'default';
-  if (!drag) return;
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, [x, y]);
+  if (pinch) {
+    if (pointers.size >= 2) { const [p1, p2] = [...pointers.values()]; setScale(pinch.L, pinch.s0 * Math.hypot(p1[0] - p2[0], p1[1] - p2[1]) / pinch.d0); pinch.moved = true; }
+    return;
+  }
+  if (!drag) {
+    const h = handleAt(x, y);
+    overlay.style.cursor = h ? ((h.i % 2 === 0) ? 'nwse-resize' : 'nesw-resize') : hitTest(x, y) ? 'grab' : 'default';
+    return;
+  }
+  if (drag.resize) { setScale(drag.L, drag.s0 * Math.hypot(x - drag.cx, y - drag.cy) / drag.d0); drag.moved = true; return; }
+  overlay.style.cursor = 'grabbing';
   const L = drag.L;
   let nx = x - drag.ox, ny = y - drag.oy;
   // snapping
@@ -271,7 +321,21 @@ overlay.addEventListener('pointermove', e => {
   L.x = Math.round(nx * 10) / 10; L.y = Math.round(ny * 10) / 10; drag.moved = true;
   draw(); syncPosInputs();
 });
-overlay.addEventListener('pointerup', () => { if (drag?.moved) commit({ redrawUI: false }); drag = null; guides = []; drawOverlay(); });
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pinch) { if (pointers.size < 2) { if (pinch.moved) commit(); pinch = null; drag = null; } return; }
+  if (drag?.moved) commit({ redrawUI: !!drag.resize }); drag = null; guides = []; drawOverlay();
+}
+overlay.addEventListener('pointerup', endPointer);
+overlay.addEventListener('pointercancel', endPointer);
+// trackpad pinch (Mac) or Ctrl + scroll wheel resizes the selected layer
+let wheelTimer = null;
+overlay.addEventListener('wheel', e => {
+  const L = sel(); if (!L || !e.ctrlKey) return;
+  e.preventDefault();
+  setScale(L, (L.scale || 1) * Math.exp(-e.deltaY * 0.01));
+  clearTimeout(wheelTimer); wheelTimer = setTimeout(() => commit(), 250);
+}, { passive: false });
 overlay.addEventListener('dblclick', () => { const ed = $('#editor'); if (ed) { ed.focus(); document.execCommand('selectAll'); } });
 function syncPosInputs() { const L = sel(); if (!L) return; const x = $('[data-k="x"]'), y = $('[data-k="y"]'); if (x) x.value = Math.round(L.x); if (y) y.value = Math.round(L.y); }
 
