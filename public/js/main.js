@@ -885,16 +885,18 @@ async function callCreate(body, onProgress) {
   let meta = {}; try { meta = JSON.parse((text.match(/<meta>\s*([\s\S]*?)\s*<\/meta>/) || [])[1] || '{}'); } catch { }
   return { code: code.replace(/^```\w*\n?|```$/g, ''), name: meta.name, sections: meta.sections, note: meta.note };
 }
+function createStatus(msg, err = false) { const el = $('#createStatus'); if (!el) return; el.hidden = !msg; el.textContent = msg || ''; el.classList.toggle('err', !!err); }
 async function runCreate(prompt, L, fixError, opts = {}) {
-  if (creating) return;
+  if (creating) return toast('Claude is still working on the last one…');
   creating = true;
+  const say = (m, ms = 120000) => { toast(m, ms); if (!L) createStatus(m); };
   const btn = L ? $('#suggestBtn') : $('#createBtn'); const btnText = btn.textContent; btn.disabled = true; btn.textContent = L ? 'Changing…' : 'Creating…';
   const uses = L ? (L.uses || []) : (opts.useLayers ? P.layers.filter(l => l.type !== 'code' && l.visible !== false).map(l => l.id) : []);
   const layerDetails = uses.map(id => P.layers.find(l => l.id === id)).filter(Boolean).map(l => { const b = layerBounds(l); return { id: l.id, name: l.name, type: l.type, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')).join('\n') : undefined, x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) }; });
-  toast(L ? (fixError ? 'Asking Claude to fix the effect… (up to a minute)' : 'Reworking your effect… (up to a minute)') : 'Claude is creating your effect… this can take up to a minute.', 60000);
+  say(L ? (fixError ? 'Asking Claude to fix the effect… (up to 2 minutes)' : 'Reworking your effect… (up to 2 minutes)') : 'Claude is designing your effect… 1–2 minutes. Keep this page open.');
   const base = { width: P.width, height: P.height, sections: P.sections, symbols: symbolNames(), layers: layerDetails, others: P.layers.filter(l => l !== L && !uses.includes(l.id)).map(l => ({ type: l.type, name: l.name, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')) : undefined })) };
   try {
-    const progress = (txt) => { const lines = (txt.split('<code>')[1] || '').split('\n').length; toast(lines > 1 ? `Claude is writing your effect… ${lines} lines so far` : 'Claude is designing your effect… (keep this page open)', 120000); };
+    const progress = (txt) => { const lines = (txt.split('<code>')[1] || '').split('\n').length; say(lines > 1 ? `Claude is writing your effect… ${lines} lines so far (keep this page open)` : 'Claude is designing your effect… (keep this page open)'); };
     let d = await callCreate({ ...base, prompt, current: L ? { code: L.code, name: L.name, prompts: L.prompts, params: L.params } : null, error: fixError || undefined }, progress);
     const target = L || newCodeLayer(P, d.name || 'Custom effect', '');
     if (!L) target.uses = uses;
@@ -904,18 +906,24 @@ async function runCreate(prompt, L, fixError, opts = {}) {
     await ensureFonts({ ...P, layers: [target] }); await imagesReady({ ...P, layers: [target] }); bumpFonts();
     let err = testEffect(target, P);
     if (err) { // one automatic repair attempt
-      toast('Polishing a glitch in the effect…', 60000);
+      say('Polishing a glitch in the effect…');
       d = await callCreate({ ...base, prompt: '', current: { code: target.code, name: target.name, prompts: target.prompts, params: target.params }, error: err }, progress);
       target.code = d.code; await ensureFonts({ ...P, layers: [target] }); await imagesReady({ ...P, layers: [target] }); err = testEffect(target);
     }
     if (prompt) (target.prompts ||= []).push(prompt);
-    if (!L) { if (d.name) target.name = d.name; P.layers.push(target); selId = target.id; }
+    let hidOld = 0;
+    if (!L) {
+      if (d.name) target.name = d.name;
+      for (const o of P.layers) if (o.type === 'code' && o.visible !== false) { o.visible = false; hidOld++; } // older effects off, so they don't draw over the new one
+      P.layers.push(target); selId = target.id;
+    }
     commit(); renderInspector();
     if (isPhone()) setMTab('edit');
     $('#suggestTarget').value = 'selected';
-    toast(err ? 'The effect still has a problem: ' + err : (d.note || 'Done.') + ' Describe changes to keep refining it.', 7000);
+    const doneMsg = err ? 'The effect still has a problem: ' + err + ' Use “Ask Claude to fix it” in its settings.' : (d.note || 'Done.') + (hidOld ? ` (I switched off ${hidOld} earlier effect${hidOld > 1 ? 's' : ''} in this animation; turn ${hidOld > 1 ? 'them' : 'it'} back on in Layers with ●.)` : '') + ' It’s playing now. To change it, select it and use the Suggest box (Selected layer).';
+    toast(doneMsg, 9000); if (!L) createStatus(doneMsg, !!err);
     range = 'full'; syncRangeButtons(); playFromStart();
-  } catch (e) { toast(e.message, 7000); }
+  } catch (e) { toast(e.message, 9000); if (!L) createStatus('That didn’t work: ' + e.message + (/fetch|network|load failed/i.test(e.message) ? ' (the connection dropped; on a phone, keep the screen on while it works).' : ''), true); }
   creating = false; btn.disabled = false; btn.textContent = btnText;
 }
 $('#createBtn').onclick = () => {

@@ -294,3 +294,6 @@ button { white-space: nowrap; }
 .creator .chk { align-items: flex-start; font-size: 12.5px; }
 .left { overflow-y: auto; }
 .layers li .used { font-size: 10.5px; color: var(--gold2); margin-left: 4px; }
+
+.createstatus { margin: 0; padding: 9px 11px; border-radius: 7px; background: var(--goldbg); color: var(--gold2); font-size: 12.5px; line-height: 1.4; }
+.createstatus.err { background: rgba(227,120,90,.14); color: #f0a184; }
