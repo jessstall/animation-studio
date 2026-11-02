@@ -885,15 +885,26 @@ async function callCreate(body, onProgress) {
   let meta = {}; try { meta = JSON.parse((text.match(/<meta>\s*([\s\S]*?)\s*<\/meta>/) || [])[1] || '{}'); } catch { }
   return { code: code.replace(/^```\w*\n?|```$/g, ''), name: meta.name, sections: meta.sections, note: meta.note };
 }
+// keep the screen awake while Claude builds (a locked phone pauses the page and drops the connection)
+let wakeLock = null, wantAwake = false;
+async function keepAwake(on) {
+  wantAwake = on;
+  try {
+    if (on && 'wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+    if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch { wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wantAwake) keepAwake(true); });
 function createStatus(msg, err = false) { const el = $('#createStatus'); if (!el) return; el.hidden = !msg; el.textContent = msg || ''; el.classList.toggle('err', !!err); }
 async function runCreate(prompt, L, fixError, opts = {}) {
   if (creating) return toast('Claude is still working on the last one…');
   creating = true;
+  keepAwake(true);
   const say = (m, ms = 120000) => { toast(m, ms); if (!L) createStatus(m); };
   const btn = L ? $('#suggestBtn') : $('#createBtn'); const btnText = btn.textContent; btn.disabled = true; btn.textContent = L ? 'Changing…' : 'Creating…';
   const uses = L ? (L.uses || []) : (opts.useLayers ? P.layers.filter(l => l.type !== 'code' && l.visible !== false).map(l => l.id) : []);
   const layerDetails = uses.map(id => P.layers.find(l => l.id === id)).filter(Boolean).map(l => { const b = layerBounds(l); return { id: l.id, name: l.name, type: l.type, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')).join('\n') : undefined, x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) }; });
-  say(L ? (fixError ? 'Asking Claude to fix the effect… (up to 2 minutes)' : 'Reworking your effect… (up to 2 minutes)') : 'Claude is designing your effect… 1–2 minutes. Keep this page open.');
+  say(L ? (fixError ? 'Asking Claude to fix the effect… (up to 2 minutes)' : 'Reworking your effect… (up to 2 minutes)') : 'Claude is designing your effect… 1–2 minutes. Your screen will stay on; keep this page open.');
   const base = { width: P.width, height: P.height, sections: P.sections, symbols: symbolNames(), layers: layerDetails, others: P.layers.filter(l => l !== L && !uses.includes(l.id)).map(l => ({ type: l.type, name: l.name, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')) : undefined })) };
   try {
     const progress = (txt) => { const lines = (txt.split('<code>')[1] || '').split('\n').length; say(lines > 1 ? `Claude is writing your effect… ${lines} lines so far (keep this page open)` : 'Claude is designing your effect… (keep this page open)'); };
@@ -924,7 +935,7 @@ async function runCreate(prompt, L, fixError, opts = {}) {
     toast(doneMsg, 9000); if (!L) createStatus(doneMsg, !!err);
     range = 'full'; syncRangeButtons(); playFromStart();
   } catch (e) { toast(e.message, 9000); if (!L) createStatus('That didn’t work: ' + e.message + (/fetch|network|load failed/i.test(e.message) ? ' (the connection dropped; on a phone, keep the screen on while it works).' : ''), true); }
-  creating = false; btn.disabled = false; btn.textContent = btnText;
+  creating = false; keepAwake(false); btn.disabled = false; btn.textContent = btnText;
 }
 $('#createBtn').onclick = () => {
   const prompt = $('#createInput').value.trim(); if (!prompt) return toast('Describe the effect first.');
