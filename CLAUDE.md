@@ -2,7 +2,7 @@
 
 Owner: Jess (Will and the Way). Very particular about typography and the look of things.
 
-- Static site in `public/` (no build step) + Cloudflare Pages Functions in `functions/`. Plain ES modules, no framework.
+- Static site in `public/` (no build step), served by a Cloudflare Worker (`wrangler.jsonc`, `src/worker.js`) that also handles `/api/suggest`. Pushing to main deploys (`npx wrangler deploy`). Plain ES modules, no framework.
 - Rendering is deterministic: `renderFrame(ctx, project, t, {scale})` draws any time `t`; export renders every frame through it. Keep it that way so preview = export.
 - Units in project pixels (1080 wide portrait by default). Canvas `shadowBlur`/`filter` blur are not affected by transforms, so they are multiplied by the render scale manually.
 - Default text drop shadow: soft and centred, subtle (black, 0.4, blur 30, no offset). Keep this default.

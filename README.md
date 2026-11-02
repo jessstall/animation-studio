@@ -16,12 +16,14 @@ A browser app for designing animated text and symbol titles for social media vid
 
 Best used in Chrome on a computer.
 
-## Hosting (Cloudflare Pages)
+## Hosting (Cloudflare Workers)
+
+Connected to Cloudflare through Workers & Pages (like willandtheway.com). Pushing to main deploys automatically.
 
 - Build command: *(none)*
-- Build output directory: `public`
-- The `functions/` folder is picked up automatically (it powers Suggest).
-- For Suggest, add a secret `ANTHROPIC_API_KEY` in the Pages project (Settings → Variables and Secrets). Optional `ANTHROPIC_MODEL` overrides the model.
+- Deploy command: `npx wrangler deploy`
+- Settings live in `wrangler.jsonc`. `src/worker.js` serves `public/` and answers `/api/suggest`.
+- For Suggest, add a secret `ANTHROPIC_API_KEY` (Workers & Pages → animation-studio → Settings → Variables and Secrets). Optional `ANTHROPIC_MODEL` overrides the model.
 
 The video encoder (ffmpeg.wasm core, ~32 MB) loads from jsDelivr the first time someone exports, then the browser caches it.
 
@@ -37,4 +39,4 @@ Put the transparent PNG (or SVG) in `public/symbols/` and add an entry to `publi
 - `public/js/editor.js` – the rich text editor
 - `public/js/export.js` – frame rendering and ffmpeg encoding
 - `public/js/main.js` – the interface
-- `functions/api/suggest.js` – Suggest (calls Claude)
+- `src/worker.js`, `src/suggest.js` – the Cloudflare Worker and Suggest (calls Claude)

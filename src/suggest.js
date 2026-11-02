@@ -1,5 +1,5 @@
-// Cloudflare Pages Function: turns a plain-language description into animation settings using Claude.
-// Needs the ANTHROPIC_API_KEY secret set in the Cloudflare Pages project settings.
+// Turns a plain-language description into animation settings using Claude.
+// Needs the ANTHROPIC_API_KEY secret set in Cloudflare: Workers & Pages → animation-studio → Settings → Variables and Secrets.
 
 const SYSTEM = `You are the motion designer inside "Animation Studio", a tool for elegant animated text and symbol titles that sit over social media videos (transparent background). The user describes the feel they want; you return animation settings as JSON only.
 
@@ -26,8 +26,8 @@ Reply with ONLY a JSON object, no prose outside it:
 {"sections": {"intro": n, "mid": n, "outro": n} (optional), "layers": [{"id": "<layer id>", "anim": {...}, "lights": {...optional}, "lines": [{"delayIn": n, "delayOut": n}] (optional, per text line, to bring lines in at different times)}], "note": "one short sentence describing what you made"}
 Only include layers you are changing. Partial objects are merged into the existing settings.`;
 
-export async function onRequestPost({ request, env }) {
-  if (!env.ANTHROPIC_API_KEY) return json({ error: 'The Suggest feature needs an Anthropic API key. Add ANTHROPIC_API_KEY in the Cloudflare Pages settings (Settings → Variables and Secrets).' }, 503);
+export async function suggest(request, env) {
+  if (!env.ANTHROPIC_API_KEY) return json({ error: 'The Suggest feature needs an Anthropic API key. Add ANTHROPIC_API_KEY in Cloudflare (Workers & Pages → animation-studio → Settings → Variables and Secrets).' }, 503);
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
   const user = `Description: ${body.prompt}\n\nApply to: ${body.target === 'all' ? 'all layers' : 'the selected layer only (id ' + body.selectedId + ')'}\n\nCurrent project:\n${JSON.stringify(body.project).slice(0, 12000)}`;
