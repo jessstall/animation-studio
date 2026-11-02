@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Animation Studio</title>
+<link rel="icon" href="icons/icon-32.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="theme-color" content="#121215">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Figtree:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="icons/mark-gold.png" alt=""><span>Animation Studio</span></div>
+  <input id="projName" class="projname" spellcheck="false" title="Animation name">
+  <div class="top-mid">
+    <select id="sizeSel" title="Video size"></select>
+    <select id="fpsSel" title="Frames per second"><option value="24">24 fps</option><option value="25">25 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select>
+  </div>
+  <div class="top-actions">
+    <button id="undoBtn" class="ghost icon" title="Undo (Ctrl/Cmd+Z)">↶</button>
+    <button id="redoBtn" class="ghost icon" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
+    <button id="newBtn" class="ghost">New</button>
+    <button id="openBtn" class="ghost">Open</button>
+    <button id="saveBtn" class="ghost">Save</button>
+    <button id="exportBtn" class="gold">Export video</button>
+  </div>
+</header>
+
+<main class="app">
+  <aside class="left panel">
+    <div class="tabs"><button data-tab="layers" class="on">Layers</button><button data-tab="symbols">Symbols</button></div>
+    <section id="tab-layers" class="tabbody">
+      <div class="addrow">
+        <button id="addText">+ Text</button><button id="addImage">+ Image</button><button id="addLight">+ Light</button>
+      </div>
+      <ul id="layerList" class="layers"></ul>
+      <p class="hint">Top of the list sits in front. Drag a PNG onto the canvas to add it.</p>
+    </section>
+    <section id="tab-symbols" class="tabbody" hidden>
+      <div class="symgroup">Will and the Way</div>
+      <div id="symGrid" class="symgrid"></div>
+      <div class="symgroup">Your symbols <button id="addSymbol" class="link">+ Add</button></div>
+      <div id="userSymGrid" class="symgrid"></div>
+      <p class="hint">Click a symbol to add it. Symbols you add here stay in this browser.</p>
+    </section>
+  </aside>
+
+  <section class="centre">
+    <form id="suggestForm" class="suggest">
+      <span class="spark">✦</span>
+      <input id="suggestInput" placeholder="Describe the animation — e.g. “words drift up softly like smoke, then lift away as birds”" autocomplete="off">
+      <select id="suggestTarget"><option value="selected">Selected layer</option><option value="all">All layers</option></select>
+      <button class="gold" id="suggestBtn">Suggest</button>
+    </form>
+    <div id="stage" class="stage">
+      <div id="canvasWrap" class="canvaswrap">
+        <canvas id="view"></canvas>
+        <canvas id="overlay"></canvas>
+      </div>
+    </div>
+    <div class="transport">
+      <button id="playBtn" class="play" title="Play / pause (Space)">▶</button>
+      <span id="timeLbl" class="time">0.00 s</span>
+      <div class="seg" id="rangeSeg">
+        <button data-range="full" class="on">Full</button><button data-range="intro">Intro</button><button data-range="mid">Mid</button><button data-range="outro">Outro</button>
+      </div>
+      <label class="chk"><input type="checkbox" id="loopChk" checked> Loop</label>
+      <div class="bgseg seg" id="bgSeg" title="Preview background (not exported)">
+        <button data-bg="checker" class="on">▦</button><button data-bg="dark">●</button><button data-bg="light">○</button><button data-bg="image" title="Use a still from your video">Still…</button>
+      </div>
+    </div>
+    <div class="timeline" id="timeline">
+      <div class="tl-head">
+        <label>Intro <input type="number" id="durIntro" step="0.1" min="0"> s</label>
+        <label>Mid <input type="number" id="durMid" step="0.1" min="0"> s</label>
+        <label>Outro <input type="number" id="durOutro" step="0.1" min="0"> s</label>
+        <span id="durTotal" class="muted"></span>
+      </div>
+      <div class="tl-body" id="tlBody">
+        <div class="tl-sections" id="tlSections"></div>
+        <div class="tl-rows" id="tlRows"></div>
+        <div class="tl-head-line" id="tlPlayhead"></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="right panel" id="inspector"></aside>
+</main>
+
+<input type="file" id="fileImage" accept="image/png,image/webp,image/svg+xml,image/jpeg" hidden multiple>
+<input type="file" id="fileSymbol" accept="image/png,image/webp,image/svg+xml" hidden multiple>
+<input type="file" id="fileFont" accept=".ttf,.otf,.woff,.woff2" hidden multiple>
+<input type="file" id="fileProject" accept=".json,application/json" hidden>
+<input type="file" id="fileStill" accept="image/*" hidden>
+
+<dialog id="exportDlg" class="dlg">
+  <h2>Export transparent video</h2>
+  <div class="cols">
+    <div>
+      <h4>Files</h4>
+      <label class="chk"><input type="checkbox" id="exMov" checked> MOV — ProRes 4444 <span class="muted">(Premiere, Final Cut, DaVinci, CapCut desktop)</span></label>
+      <label class="chk"><input type="checkbox" id="exWebm" checked> WebM with transparency <span class="muted">(web apps, Chrome)</span></label>
+      <label class="chk"><input type="checkbox" id="exPng"> PNG frames <span class="muted">(zip, works anywhere)</span></label>
+    </div>
+    <div>
+      <h4>Pieces</h4>
+      <label class="chk"><input type="checkbox" id="exFull" checked> Full animation</label>
+      <label class="chk"><input type="checkbox" id="exIntro" checked> Intro</label>
+      <label class="chk"><input type="checkbox" id="exMid" checked> Mid section</label>
+      <label class="chk"><input type="checkbox" id="exOutro" checked> Outro</label>
+    </div>
+  </div>
+  <p class="muted small" id="exInfo"></p>
+  <div class="prog" id="exProg" hidden><i></i></div>
+  <p id="exStatus" class="small"></p>
+  <ul id="exResults" class="results"></ul>
+  <div class="dlg-actions">
+    <button id="exZip" class="ghost" hidden>Download all (.zip)</button>
+    <button id="exClose" class="ghost">Close</button>
+    <button id="exGo" class="gold">Export</button>
+  </div>
+</dialog>
+
+<dialog id="openDlg" class="dlg">
+  <h2>Your animations</h2>
+  <ul id="projList" class="projlist"></ul>
+  <div class="dlg-actions">
+    <button id="importProj" class="ghost">Import file…</button>
+    <button id="exportProj" class="ghost">Download current as file</button>
+    <button id="openClose" class="gold">Close</button>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" hidden></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
