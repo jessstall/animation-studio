@@ -12,7 +12,7 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
 
 let P = null;              // project
 let selId = null;
-let T = 0, playing = false, range = 'full', loop = true;
+let T = 0, playing = false, range = 'full', loop = true, once = false;
 let pScale = 0.5;          // preview pixels per project pixel
 let guides = [];
 let lastRange = null;      // last text selection in the editor
@@ -106,7 +106,10 @@ function tick(ts) {
   const dt = lastTs ? (ts - lastTs) / 1000 : 0; lastTs = ts;
   const [a, b] = rangeBounds();
   T += dt;
-  if (T >= b) { if (loop) T = a + ((T - a) % Math.max(0.001, b - a)); else { T = b; setPlaying(false); } }
+  if (T >= b) {
+    if (once) { once = false; T = Math.min(b, totalDuration(P) - 0.0001); range = 'full'; syncRangeButtons(); setPlaying(false); return; }
+    if (loop) T = a + ((T - a) % Math.max(0.001, b - a)); else { T = b; setPlaying(false); }
+  }
   draw();
   requestAnimationFrame(tick);
 }
@@ -115,7 +118,9 @@ function setPlaying(on) {
   if (on) { const [a, b] = rangeBounds(); if (T < a || T >= b - 0.01) T = a; lastTs = 0; requestAnimationFrame(tick); }
   draw();
 }
-const playFromStart = () => { const [a] = rangeBounds(); T = a; setPlaying(true); };
+const playFromStart = () => { once = false; const [a] = rangeBounds(); T = a; setPlaying(true); };
+// play one section once, then go back to Full
+const previewOnce = (r) => { range = r; syncRangeButtons(); const [a] = rangeBounds(); T = a; once = true; setPlaying(true); };
 
 // ---------------- layers panel ----------------
 function renderLayerList() {
@@ -488,7 +493,7 @@ function bindInspector(L) {
     if (id === 'birds' && phase === 'out' && P.sections.outro < 2.6) P.sections.outro = 3;
     if (id === 'particles' && phase === 'out' && P.sections.outro < 1.9) P.sections.outro = 2.2;
     commit(); renderInspector();
-    range = phase === 'in' ? 'intro' : 'outro'; syncRangeButtons(); playFromStart();
+    previewOnce(phase === 'in' ? 'intro' : 'outro');
   });
   box.querySelectorAll('[data-by]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.onclick = () => {
     const a = L.anim[seg.dataset.by]; a.by = b.dataset.v;
@@ -497,9 +502,9 @@ function bindInspector(L) {
   }));
   box.querySelectorAll('[data-mid]').forEach(b => b.onclick = () => {
     const m = L.anim.mid; m.preset = b.dataset.mid; m.period = 0; m.amount = 1; m.color = MID[m.preset]?.color || m.color;
-    commit(); renderInspector(); range = 'mid'; syncRangeButtons(); playFromStart();
+    commit(); renderInspector(); previewOnce('mid');
   });
-  box.querySelectorAll('[data-preview]').forEach(b => b.onclick = () => { range = b.dataset.preview === 'in' ? 'intro' : 'outro'; syncRangeButtons(); playFromStart(); });
+  box.querySelectorAll('[data-preview]').forEach(b => b.onclick = () => previewOnce(b.dataset.preview === 'in' ? 'intro' : 'outro'));
   box.querySelectorAll('#alignSeg button').forEach(b => b.onclick = () => { L.align = b.dataset.al; commit(); renderInspector(); });
   box.querySelectorAll('#spreadSeg button').forEach(b => b.onclick = () => { L.lights.rays.spread = +b.dataset.sp; commit(); renderInspector(); });
   box.querySelectorAll('[data-line]').forEach(inp => inp.addEventListener('input', () => { const v = parseFloat(inp.value); if (isNaN(v)) return; L.lines[+inp.dataset.line][inp.dataset.lk] = v; commit(); }));
@@ -621,7 +626,7 @@ function loadProject(d) { P = d; selId = P.layers[P.layers.length - 1]?.id || nu
 function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
 
 // transport
-$('#playBtn').onclick = () => setPlaying(!playing);
+$('#playBtn').onclick = () => { once = false; setPlaying(!playing); };
 function syncRangeButtons() { $$('#rangeSeg button').forEach(b => b.classList.toggle('on', b.dataset.range === range)); }
 $$('#rangeSeg button').forEach(b => b.onclick = () => { range = b.dataset.range; syncRangeButtons(); playFromStart(); });
 $('#loopChk').onchange = e => loop = e.target.checked;

@@ -158,3 +158,25 @@ input[type=checkbox] { accent-color: var(--gold); }
 .projlist .nm small { display: block; color: var(--muted); }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #2b2b33; border: 1px solid var(--line2); padding: 10px 16px; border-radius: 8px; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,.4); max-width: 80vw; }
 .dropping .canvaswrap { outline: 2px dashed var(--gold); outline-offset: 6px; }
+
+button { white-space: nowrap; }
+.transport { flex-wrap: wrap; row-gap: 6px; }
+@media (max-width: 1400px) {
+  .app { grid-template-columns: 210px 1fr 310px; }
+  .top { gap: 10px; }
+  .projname { width: 170px; }
+  .top-actions button { padding: 6px 9px; }
+  .addrow button { font-size: 12px; }
+}
+@media (max-width: 1180px) {
+  .app { grid-template-columns: 190px 1fr 290px; }
+  .brand span { display: none; }
+  #sizeSel { max-width: 150px; }
+  .suggest select { max-width: 120px; }
+  .tl-head { flex-wrap: wrap; gap: 8px 14px; }
+}
+.layers li .nm { min-width: 48px; }
+@media (max-width: 1400px) {
+  .layers li button { display: none; padding: 1px 3px; }
+  .layers li:hover button { display: inline-block; }
+}
