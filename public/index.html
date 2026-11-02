@@ -49,7 +49,14 @@
       <p class="hint">Click a symbol to add it. Symbols you add here stay in this browser.</p>
     </section>
     <section id="tab-effects" class="tabbody" hidden>
-      <div class="symgroup">Your saved effects</div>
+      <div class="symgroup">Create a custom effect</div>
+      <div class="creator">
+        <textarea id="createInput" rows="5" placeholder="Describe anything — e.g. “A broken heart comes together and heals. Gold light runs up the seam, the heart pulses with rays, then dissolves into pieces that form my text and symbol.”"></textarea>
+        <label class="chk"><input type="checkbox" id="createUse" checked> <span>Build it from my layers <span class="muted">(the text and symbols on the canvas appear only when the effect brings them in)</span></span></label>
+        <button class="gold" id="createBtn">Create effect</button>
+        <p class="hint" style="margin:0">Claude writes it from scratch: 1–2 minutes. Keep this page open. To change it afterwards, select it and describe the change in the Suggest box (Selected layer).</p>
+      </div>
+      <div class="symgroup" style="margin-top:16px">Your saved effects</div>
       <div id="effectGrid" class="effgrid"></div>
       <p class="hint">Save a custom effect from its settings panel (“Save to effects library”). Click one here to add it, then change its words and colours in its settings.</p>
     </section>
@@ -58,8 +65,8 @@
   <section class="centre">
     <form id="suggestForm" class="suggest">
       <span class="spark">✦</span>
-      <textarea id="suggestInput" rows="1" placeholder="Describe any animation — e.g. “a broken heart comes together and heals, gold light shines, then it turns into the symbol and lettering”" autocomplete="off"></textarea>
-      <select id="suggestTarget"><option value="new">New custom effect</option><option value="selected">Selected layer</option><option value="all">All layers</option></select>
+      <textarea id="suggestInput" rows="1" placeholder="Describe how the selected layer (or all layers) should move — or how to change a selected custom effect" autocomplete="off"></textarea>
+      <select id="suggestTarget"><option value="selected">Selected layer</option><option value="all">All layers</option></select>
       <button class="gold" id="suggestBtn">Suggest</button>
     </form>
     <div class="viewer" id="viewer">

@@ -288,3 +288,9 @@ button { white-space: nowrap; }
   .stage { transition: height .2s ease; }
 }
 @media (max-width: 760px) { body.typing #overlay { opacity: 0; } }
+
+.creator { display: flex; flex-direction: column; gap: 10px; }
+.creator textarea { width: 100%; resize: vertical; min-height: 110px; line-height: 1.4; }
+.creator .chk { align-items: flex-start; font-size: 12.5px; }
+.left { overflow-y: auto; }
+.layers li .used { font-size: 10.5px; color: var(--gold2); margin-left: 4px; }

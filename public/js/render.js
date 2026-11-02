@@ -252,13 +252,30 @@ const mixHex = (hex, toWhite) => {
 // ---------- main entry ----------
 // ctx canvas must be project.width*scale x project.height*scale
 export const nativeBlur = FILTER_OK;
+// A layer drawn at rest (no animation), full frame, at scale S — used by custom effects that build from Jess's layers.
+const snapCache = new Map();
+export function layerSnapshot(layer, project, S) {
+  const key = JSON.stringify([layer, S, project.width, project.height, fontVersion]);
+  const hit = snapCache.get(layer.id + '|' + S);
+  if (hit && hit.key === key) return hit.canvas;
+  const c = document.createElement('canvas'); c.width = Math.round(project.width * S); c.height = Math.round(project.height * S);
+  const still = JSON.parse(JSON.stringify(layer));
+  still.anim.in.preset = 'none'; still.anim.out.preset = 'none'; still.anim.mid.preset = 'none';
+  let pending = false;
+  if (still.type === 'image' && !getImage(still.src)) pending = true;
+  renderFrame(c.getContext('2d'), { ...project, layers: [still] }, 0, { scale: S });
+  if (!pending) snapCache.set(layer.id + '|' + S, { key, canvas: c });
+  return c;
+}
 export function renderFrame(ctx, project, t, { scale = 1, background = false, strict = false } = {}) {
   const W = Math.round(project.width * scale), H = Math.round(project.height * scale);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, W, H);
   if (background) drawBackground(ctx, project, W, H);
+  const taken = new Set();
+  for (const l of project.layers) if (l.type === 'code' && l.visible !== false) for (const id of l.uses || []) taken.add(id);
   project.layers.forEach((layer, i) => {
-    if (layer.visible === false) return;
+    if (layer.visible === false || taken.has(layer.id)) return;
     if (layer.type === 'code') drawCodeLayer(ctx, layer, project, t, scale, i, W, H, strict, background);
     else drawLayer(ctx, layer, project, t, scale, i, W, H);
   });
@@ -670,4 +687,4 @@ export function drawBird(c, x, y, s, flap, heading = 0) {
   c.restore();
 }
 
-setCodeDeps({ getImage, fontStr, withBlur, fontVersion: () => fontVersion });
+setCodeDeps({ getImage, fontStr, withBlur, fontVersion: () => fontVersion, layerSnapshot, layerBounds });

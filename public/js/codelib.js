@@ -93,8 +93,30 @@ export function makeLib(ctx, project, S, layer) {
   const { intro, mid, outro } = project.sections;
   const total = intro + mid + outro;
   const pk = layer ? layer.id + JSON.stringify(layer.params || {}) : '';
+  // Jess's own layers that this effect builds from (hidden from normal drawing while the effect is on)
+  const used = layer ? (layer.uses || []).map(id => project.layers.find(l => l.id === id)).filter(Boolean) : [];
+  const layerInfo = used.map(l => {
+    const b = deps.layerBounds(l);
+    return { id: l.id, name: l.name, type: l.type, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')).join('\n') : '', x: b.x, y: b.y, w: b.w, h: b.h, cx: b.cx, cy: b.cy };
+  });
+  const findLayer = (ref) => used.find(l => l.id === ref || l.name === ref) || (typeof ref === 'number' ? used[ref] : null);
+  const layersKey = JSON.stringify(used) + deps.fontVersion();
   const lib = {
     W, H, cx: W / 2, cy: H / 2,
+    // Jess's layers handed to this effect: [{id, name, type, text, x, y, w, h, cx, cy}] (bounds in project px)
+    layers: layerInfo,
+    // draw one of those layers exactly as she designed it (ref = index, id or name). o: {alpha}
+    drawLayer(ref, o = {}) {
+      const L = findLayer(ref); if (!L) return;
+      ctx.save(); if (o.alpha !== undefined) ctx.globalAlpha *= clamp(o.alpha);
+      ctx.drawImage(deps.layerSnapshot(L, project, S), 0, 0, W, H); ctx.restore();
+    },
+    drawLayers(o = {}) { for (let i = 0; i < used.length; i++) lib.drawLayer(i, o); },
+    // particle points of a layer (or of all of them with ref = 'all'), for morphs/dissolves into or out of them
+    layerPoints(ref = 'all', step = 4) {
+      const list = ref === 'all' ? used : [findLayer(ref)].filter(Boolean);
+      return lib.points('layers:' + list.map(l => l.id).join(',') + layersKey, (c) => { for (const L of list) c.drawImage(deps.layerSnapshot(L, project, 1), 0, 0, W, H); }, step);
+    },
     T: { intro, mid, outro, total, midStart: intro, outroStart: intro + mid },
     // editable words & settings: const P = lib.params({ title: 'Will and the Way', colour: '#B8892A', ... })
     params(defaults = {}) {

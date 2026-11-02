@@ -15,6 +15,12 @@ Editable words & settings (required): start the code with
   const P = lib.params({ ...defaults... });
 and put EVERY piece of wording, the symbol name(s), and the 2–4 main colours in it, then use P.<name> everywhere (never hard-code words elsewhere). Jess reuses effects with different words, so the layout must adapt to the text: measure it with lib.measure and shrink the size to fit the frame width (about 86% of lib.W); split on '\n' to allow multiple lines. Use clear camelCase names, e.g. { title: 'Will and the Way', subtitle: '', symbol: 'will-and-the-way-mark', symbolColour: 'gold', lightColour: '#FFD98A', textColour: '#F6EFE3' } (symbol colours are 'gold' | 'white' | 'black'; other colours are '#RRGGBB'). Keep the same names when revising.
 
+Jess's own layers: if the request lists layers handed to the effect, those layers are hidden from normal playback and appear ONLY where your code draws them. Use:
+- lib.layers -> [{id, name, type: 'text'|'image'|'light', text, x, y, w, h, cx, cy}] (bounds in project px; her typography, symbols and layout, exactly as she designed them)
+- lib.drawLayer(index|id|name, {alpha}) draws that layer exactly as designed; lib.drawLayers({alpha}) draws them all
+- lib.layerPoints(index|id|name|'all', step=4) particle points of a layer or of all of them, for lib.morph / lib.disperse
+Rules when layers are handed over: never retype or restyle their words yourself; the story should end the intro with her layers fully shown exactly as designed (lib.drawLayers at alpha 1) and hold them through the mid section; place your own elements (hearts, light, etc.) relative to their bounds or the frame centre so nothing collides; work from lib.layers generically (loop over them) so the effect can be reused with other layers. In this case lib.params holds only the look (colours, sizes, the shape), not words.
+
 Toolkit (lib):
 - lib.params(defaults) -> the defaults merged with what Jess has typed in (see above)
 - lib.W, lib.H, lib.cx, lib.cy, lib.T = {intro, mid, outro, total, midStart, outroStart}
@@ -60,7 +66,9 @@ export async function create(request, env) {
   if (!env.ANTHROPIC_API_KEY) return json({ error: 'Custom effects need an Anthropic API key. Add ANTHROPIC_API_KEY in Cloudflare (Workers & Pages → animation-studio → Settings → Variables and Secrets).' }, 503);
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
-  const ctxInfo = `Frame: ${body.width} x ${body.height}. Current sections: ${JSON.stringify(body.sections)}.\nWill and the Way symbols available (use these names): ${(body.symbols || []).join(', ')}.\nOther layers in the animation (for context; your effect is drawn as its own layer): ${JSON.stringify(body.others || []).slice(0, 2000)}`;
+  const ctxInfo = `Frame: ${body.width} x ${body.height}. Current sections: ${JSON.stringify(body.sections)}.\nWill and the Way symbols available (use these names): ${(body.symbols || []).join(', ')}.\n` + (body.layers && body.layers.length
+    ? `\nLayers handed to this effect (lib.layers, in this order): ${JSON.stringify(body.layers).slice(0, 3000)}`
+    : `\nNo layers are handed to this effect: draw everything yourself. Other layers in the animation (drawn separately, for context): ${JSON.stringify(body.others || []).slice(0, 1500)}`);
   let user; let ctxInfo2 = '';
   if (body.current && body.current.params && Object.keys(body.current.params).length) ctxInfo2 = `\nJess's current values for the editable settings: ${JSON.stringify(body.current.params)}`;
   if (body.current && body.current.code) {

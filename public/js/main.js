@@ -135,7 +135,7 @@ function renderLayerList() {
   ul.innerHTML = [...P.layers].reverse().map(l => {
     const icon = l.type === 'text' ? 'Aa' : l.type === 'light' ? '✺' : l.type === 'code' ? '✦' : `<img src="${esc(l.src)}" style="${l.tint ? '' : ''}">`;
     return `<li data-id="${l.id}" class="${l.id === selId ? 'sel' : ''} ${l.visible === false ? 'hidden' : ''}">
-      <span class="ty">${icon}</span><span class="nm">${esc(l.name)}</span>
+      <span class="ty">${icon}</span><span class="nm">${esc(l.name)}${P.layers.some(c => c.type === 'code' && c.visible !== false && (c.uses || []).includes(l.id)) ? '<span class="used">in effect</span>' : ''}</span>
       <button data-act="vis" title="Show / hide">${l.visible === false ? '◌' : '●'}</button>
       <button data-act="up" title="Bring forward">↑</button><button data-act="down" title="Send back">↓</button>
       <button data-act="dup" title="Duplicate">⧉</button><button data-act="del" title="Delete">✕</button></li>`;
@@ -553,6 +553,7 @@ function renderInspector() {
       ${L.paramDefs && Object.keys(L.paramDefs).length ? `<div class="subhead">Words & settings</div><div class="params">${paramFields(L)}</div><button class="ghost" id="resetParams">Back to the original words & colours</button>`
         : `<p class="note">The words in this effect are built into it.</p><button class="ghost" id="makeEditable">Make the words & colours editable</button>`}
       <button class="ghost" id="saveEffect">Save to effects library</button>
+      ${(L.uses || []).length ? `<p class="note">Builds from your layers: ${(L.uses || []).map(id => esc(P.layers.find(l => l.id === id)?.name || '?')).join(', ')}. They only appear when this effect brings them in; edit their words and style as usual. <button class="link" id="releaseLayers">Show them normally again</button></p>` : ''}
       <div class="note" style="margin-top:6px">Made from:</div>
       <ol class="prompts">${(L.prompts || []).map(p => `<li>${esc(p)}</li>`).join('') || '<li class="muted">(written by hand)</li>'}</ol>
       <p class="note">To change it, keep this layer selected, choose <b>Selected layer</b> next to the Suggest box, and describe the change, e.g. “make the gold light warmer and slower”.</p>
@@ -676,6 +677,7 @@ function bindInspector(L) {
   const rp = $('#resetParams'); if (rp) rp.onclick = () => { L.params = {}; commit(); renderInspector(); };
   const me = $('#makeEditable'); if (me) me.onclick = () => runCreate('Move all the wording, the symbol choice and the main colours into const P = lib.params({...}) at the top so they can be edited, and make the layout adapt to different text. Do not change how it looks.', L);
   const se = $('#saveEffect'); if (se) se.onclick = () => saveEffect(L);
+  const rl = $('#releaseLayers'); if (rl) rl.onclick = () => { L.uses = []; commit(); renderInspector(); };
   const ac = $('#applyCode'); if (ac) ac.onclick = () => { L.code = $('#effectCode').value; compileEffect(L); commit(); draw(); setTimeout(renderInspector, 50); };
   const fx = $('#fixEffect'); if (fx) fx.onclick = () => runCreate('', L, effectError(L));
   const rep = $('#replaceImg'); if (rep) rep.onclick = () => { const f = $('#fileImage'); f.dataset.replace = L.id; f.click(); };
@@ -841,9 +843,8 @@ $('#suggestForm').onsubmit = async e => {
   e.preventDefault();
   const prompt = $('#suggestInput').value.trim(); if (!prompt) return;
   const target = $('#suggestTarget').value;
-  if (target === 'new') return runCreate(prompt, null);
   if (target === 'selected' && sel()?.type === 'code') return runCreate(prompt, sel());
-  if (target === 'selected' && !sel()) return toast('Select a layer first, or choose “All layers” or “New custom effect”.');
+  if (target === 'selected' && !sel()) return toast('Select a layer first, or choose “All layers”. To create a custom effect, use the Effects tab.');
   const btn = $('#suggestBtn'); btn.disabled = true; btn.textContent = 'Thinking…';
   const summary = { sections: P.sections, layers: P.layers.map(l => ({ id: l.id, type: l.type, name: l.name, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')) : undefined, anim: l.anim, lights: l.lights })) };
   try {
@@ -860,13 +861,13 @@ $('#suggestForm').onsubmit = async e => {
 };
 // ---------- custom effects ----------
 let creating = false;
-function testEffect(L) {
+function testEffect(L, proj = P) {
   const e = compileEffect(L);
   if (e.error) return e.error;
   const c = document.createElement('canvas'); c.width = Math.round(P.width * 0.25); c.height = Math.round(P.height * 0.25);
   const x = c.getContext('2d');
   const tot = totalDuration(P);
-  try { for (const t of [0, P.sections.intro * 0.5, P.sections.intro, P.sections.intro + P.sections.mid * 0.5, P.sections.intro + P.sections.mid + P.sections.outro * 0.5, tot - 0.01]) renderFrame(x, { ...P, layers: [L] }, t, { scale: 0.25, strict: true }); }
+  try { for (const t of [0, P.sections.intro * 0.5, P.sections.intro, P.sections.intro + P.sections.mid * 0.5, P.sections.intro + P.sections.mid + P.sections.outro * 0.5, tot - 0.01]) renderFrame(x, { ...proj, layers: proj.layers.includes(L) ? proj.layers : [...proj.layers, L] }, t, { scale: 0.25, strict: true }); }
   catch (err) { return err.message; }
   return null;
 }
@@ -878,26 +879,30 @@ async function callCreate(body, onProgress) {
   const reader = r.body.getReader(), dec = new TextDecoder(); let text = '';
   for (;;) { const { done, value } = await reader.read(); if (done) break; text += dec.decode(value, { stream: true }); onProgress?.(text); }
   const e = text.match(/<error>([\s\S]*?)<\/error>/); if (e && !text.includes('</code>')) throw new Error('Claude stopped: ' + e[1]);
-  const code = (text.match(/<code>\s*([\s\S]*?)\s*<\/code>/) || [])[1];
+  let code = (text.match(/<code>\s*([\s\S]*?)\s*<\/code>/) || [])[1];
+  if (!code && text.includes('<code>')) code = text.split('<code>')[1].replace(/<error>[\s\S]*$/, ''); // cut off: keep what arrived, the studio will ask Claude to repair it
   if (!code) throw new Error('No effect came back. Try describing it again.');
   let meta = {}; try { meta = JSON.parse((text.match(/<meta>\s*([\s\S]*?)\s*<\/meta>/) || [])[1] || '{}'); } catch { }
   return { code: code.replace(/^```\w*\n?|```$/g, ''), name: meta.name, sections: meta.sections, note: meta.note };
 }
-async function runCreate(prompt, L, fixError) {
+async function runCreate(prompt, L, fixError, opts = {}) {
   if (creating) return;
   creating = true;
-  const btn = $('#suggestBtn'); btn.disabled = true; btn.textContent = L ? 'Changing…' : 'Creating…';
+  const btn = L ? $('#suggestBtn') : $('#createBtn'); const btnText = btn.textContent; btn.disabled = true; btn.textContent = L ? 'Changing…' : 'Creating…';
+  const uses = L ? (L.uses || []) : (opts.useLayers ? P.layers.filter(l => l.type !== 'code' && l.visible !== false).map(l => l.id) : []);
+  const layerDetails = uses.map(id => P.layers.find(l => l.id === id)).filter(Boolean).map(l => { const b = layerBounds(l); return { id: l.id, name: l.name, type: l.type, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')).join('\n') : undefined, x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) }; });
   toast(L ? (fixError ? 'Asking Claude to fix the effect… (up to a minute)' : 'Reworking your effect… (up to a minute)') : 'Claude is creating your effect… this can take up to a minute.', 60000);
-  const base = { width: P.width, height: P.height, sections: P.sections, symbols: symbolNames(), others: P.layers.filter(l => l !== L).map(l => ({ type: l.type, name: l.name, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')) : undefined })) };
+  const base = { width: P.width, height: P.height, sections: P.sections, symbols: symbolNames(), layers: layerDetails, others: P.layers.filter(l => l !== L && !uses.includes(l.id)).map(l => ({ type: l.type, name: l.name, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')) : undefined })) };
   try {
-    const progress = (txt) => { const lines = (txt.split('<code>')[1] || '').split('\n').length; toast(lines > 1 ? `Claude is writing your effect… ${lines} lines so far` : 'Claude is designing your effect…', 60000); };
+    const progress = (txt) => { const lines = (txt.split('<code>')[1] || '').split('\n').length; toast(lines > 1 ? `Claude is writing your effect… ${lines} lines so far` : 'Claude is designing your effect… (keep this page open)', 120000); };
     let d = await callCreate({ ...base, prompt, current: L ? { code: L.code, name: L.name, prompts: L.prompts, params: L.params } : null, error: fixError || undefined }, progress);
     const target = L || newCodeLayer(P, d.name || 'Custom effect', '');
+    if (!L) target.uses = uses;
     const before = target.code;
     target.code = d.code;
     if (d.sections && (!L || prompt)) for (const k of ['intro', 'mid', 'outro']) if (typeof d.sections[k] === 'number' && d.sections[k] > 0) P.sections[k] = Math.round(d.sections[k] * 100) / 100;
     await ensureFonts({ ...P, layers: [target] }); await imagesReady({ ...P, layers: [target] }); bumpFonts();
-    let err = testEffect(target);
+    let err = testEffect(target, P);
     if (err) { // one automatic repair attempt
       toast('Polishing a glitch in the effect…', 60000);
       d = await callCreate({ ...base, prompt: '', current: { code: target.code, name: target.name, prompts: target.prompts, params: target.params }, error: err }, progress);
@@ -911,8 +916,12 @@ async function runCreate(prompt, L, fixError) {
     toast(err ? 'The effect still has a problem: ' + err : (d.note || 'Done.') + ' Describe changes to keep refining it.', 7000);
     range = 'full'; syncRangeButtons(); playFromStart();
   } catch (e) { toast(e.message, 7000); }
-  creating = false; btn.disabled = false; btn.textContent = 'Suggest';
+  creating = false; btn.disabled = false; btn.textContent = btnText;
 }
+$('#createBtn').onclick = () => {
+  const prompt = $('#createInput').value.trim(); if (!prompt) return toast('Describe the effect first.');
+  runCreate(prompt, null, null, { useLayers: $('#createUse').checked });
+};
 
 // ---------- effects library ----------
 async function effectThumb(L) {
@@ -921,13 +930,13 @@ async function effectThumb(L) {
   const x = c.getContext('2d'); x.fillStyle = '#2f3b48'; x.fillRect(0, 0, c.width, c.height);
   const t = Math.min(totalDuration(P) - 0.01, P.sections.intro + Math.min(1, P.sections.mid / 2));
   const tmp = document.createElement('canvas'); tmp.width = c.width; tmp.height = c.height;
-  try { renderFrame(tmp.getContext('2d'), { ...P, layers: [L] }, t, { scale: s }); } catch { }
+  try { renderFrame(tmp.getContext('2d'), { ...P, layers: P.layers.filter(l => l === L || (L.uses || []).includes(l.id)) }, t, { scale: s }); } catch { }
   x.drawImage(tmp, 0, 0);
   return c.toDataURL('image/jpeg', 0.85);
 }
 async function saveEffect(L) {
   const name = prompt('Name for this effect in your library', L.name); if (!name) return;
-  await store.put('effects', { id: uid(), name, code: L.code, prompts: L.prompts || [], paramDefs: L.paramDefs || {}, params: { ...(L.params || {}) }, sections: { ...P.sections }, size: [P.width, P.height], thumb: await effectThumb(L), saved: Date.now() });
+  await store.put('effects', { id: uid(), name, code: L.code, prompts: L.prompts || [], paramDefs: L.paramDefs || {}, params: { ...(L.params || {}) }, usesLayers: !!(L.uses && L.uses.length), sections: { ...P.sections }, size: [P.width, P.height], thumb: await effectThumb(L), saved: Date.now() });
   toast('Saved to your effects library (Effects tab).');
 }
 async function renderEffects() {
@@ -939,6 +948,7 @@ $('#effectGrid').addEventListener('click', async e => {
   const d = e.target.closest('.eff'); if (!d) return;
   const r = await store.get('effects', d.dataset.id);
   const L = newCodeLayer(P, r.name, r.code); L.prompts = [...(r.prompts || [])]; L.params = { ...(r.params || {}) };
+  if (r.usesLayers) L.uses = P.layers.filter(l => l.type !== 'code' && l.visible !== false).map(l => l.id);
   if (r.sections) P.sections = { ...r.sections };
   addLayer(L); await ensureFonts(P); await imagesReady(P); bumpFonts(); renderInspector();
   toast('Added. Its timing (intro, mid, outro) has been set to match the effect. Change its words in the settings panel.', 6000);
