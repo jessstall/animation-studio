@@ -66,16 +66,33 @@ export async function create(request, env) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: env.ANTHROPIC_CODE_MODEL || 'claude-opus-5-5', max_tokens: 12000, system: SYSTEM, messages: [{ role: 'user', content: user }] }),
+    body: JSON.stringify({ model: env.ANTHROPIC_CODE_MODEL || 'claude-opus-5-5', max_tokens: 12000, stream: true, system: SYSTEM, messages: [{ role: 'user', content: user }] }),
   });
   if (!r.ok) return json({ error: 'Claude could not be reached (' + r.status + '): ' + (await r.text()).slice(0, 300) }, 502);
-  const data = await r.json();
-  const text = (data.content || []).map(c => c.text || '').join('');
-  const code = (text.match(/<code>\s*([\s\S]*?)\s*<\/code>/) || [])[1];
-  let meta = {};
-  try { meta = JSON.parse((text.match(/<meta>\s*([\s\S]*?)\s*<\/meta>/) || [])[1] || '{}'); } catch { }
-  if (!code) return json({ error: 'No effect came back. Try describing it again.' }, 502);
-  return json({ code: code.replace(/^```\w*\n?|```$/g, ''), name: meta.name, sections: meta.sections, note: meta.note });
+  // Stream Claude's text straight through as plain text, so long effects never time out.
+  const { readable, writable } = new TransformStream();
+  const out = writable.getWriter(), enc = new TextEncoder(), dec = new TextDecoder();
+  (async () => {
+    const reader = r.body.getReader(); let buf = '';
+    try {
+      for (;;) {
+        const { done, value } = await reader.read(); if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+          if (!line.startsWith('data:')) continue;
+          try {
+            const ev = JSON.parse(line.slice(5));
+            if (ev.type === 'content_block_delta' && ev.delta?.text) await out.write(enc.encode(ev.delta.text));
+            if (ev.type === 'error') await out.write(enc.encode('\n<error>' + (ev.error?.message || 'error') + '</error>'));
+          } catch { }
+        }
+      }
+    } catch (e) { await out.write(enc.encode('\n<error>' + e.message + '</error>')); }
+    await out.close();
+  })();
+  return new Response(readable, { headers: { 'content-type': 'text/plain; charset=utf-8', 'x-effect-stream': '1', 'cache-control': 'no-store' } });
 }
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });

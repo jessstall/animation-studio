@@ -836,12 +836,18 @@ function testEffect(L) {
   catch (err) { return err.message; }
   return null;
 }
-async function callCreate(body) {
+async function callCreate(body, onProgress) {
   const r = await fetch('api/create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const ct = r.headers.get('content-type') || '';
-  if (!ct.includes('json')) throw new Error('Custom effects are not switched on yet (the studio needs to be published with the Anthropic API key).');
-  const d = await r.json(); if (d.error) throw new Error(d.error);
-  return d;
+  if (ct.includes('json')) { const d = await r.json(); throw new Error(d.error || 'Something went wrong.'); }
+  if (!r.headers.get('x-effect-stream')) throw new Error('Custom effects are not switched on yet (the studio needs to be published with the Anthropic API key).');
+  const reader = r.body.getReader(), dec = new TextDecoder(); let text = '';
+  for (;;) { const { done, value } = await reader.read(); if (done) break; text += dec.decode(value, { stream: true }); onProgress?.(text); }
+  const e = text.match(/<error>([\s\S]*?)<\/error>/); if (e && !text.includes('</code>')) throw new Error('Claude stopped: ' + e[1]);
+  const code = (text.match(/<code>\s*([\s\S]*?)\s*<\/code>/) || [])[1];
+  if (!code) throw new Error('No effect came back. Try describing it again.');
+  let meta = {}; try { meta = JSON.parse((text.match(/<meta>\s*([\s\S]*?)\s*<\/meta>/) || [])[1] || '{}'); } catch { }
+  return { code: code.replace(/^```\w*\n?|```$/g, ''), name: meta.name, sections: meta.sections, note: meta.note };
 }
 async function runCreate(prompt, L, fixError) {
   if (creating) return;
@@ -850,7 +856,8 @@ async function runCreate(prompt, L, fixError) {
   toast(L ? (fixError ? 'Asking Claude to fix the effect… (up to a minute)' : 'Reworking your effect… (up to a minute)') : 'Claude is creating your effect… this can take up to a minute.', 60000);
   const base = { width: P.width, height: P.height, sections: P.sections, symbols: symbolNames(), others: P.layers.filter(l => l !== L).map(l => ({ type: l.type, name: l.name, text: l.type === 'text' ? l.lines.map(x => x.runs.map(r => r.text).join('')) : undefined })) };
   try {
-    let d = await callCreate({ ...base, prompt, current: L ? { code: L.code, name: L.name, prompts: L.prompts } : null, error: fixError || undefined });
+    const progress = (txt) => { const lines = (txt.split('<code>')[1] || '').split('\n').length; toast(lines > 1 ? `Claude is writing your effect… ${lines} lines so far` : 'Claude is designing your effect…', 60000); };
+    let d = await callCreate({ ...base, prompt, current: L ? { code: L.code, name: L.name, prompts: L.prompts } : null, error: fixError || undefined }, progress);
     const target = L || newCodeLayer(P, d.name || 'Custom effect', '');
     const before = target.code;
     target.code = d.code;
@@ -859,7 +866,7 @@ async function runCreate(prompt, L, fixError) {
     let err = testEffect(target);
     if (err) { // one automatic repair attempt
       toast('Polishing a glitch in the effect…', 60000);
-      d = await callCreate({ ...base, prompt: '', current: { code: target.code, name: target.name, prompts: target.prompts }, error: err });
+      d = await callCreate({ ...base, prompt: '', current: { code: target.code, name: target.name, prompts: target.prompts }, error: err }, progress);
       target.code = d.code; await ensureFonts({ ...P, layers: [target] }); await imagesReady({ ...P, layers: [target] }); err = testEffect(target);
     }
     if (prompt) (target.prompts ||= []).push(prompt);
