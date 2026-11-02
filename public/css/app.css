@@ -252,3 +252,6 @@ button { white-space: nowrap; }
   body:not([data-m="timing"]) .timeline { display: none; }
   .insp-empty { padding: 24px 16px; }
 }
+
+.tbalign { margin-left: auto; }
+.tbalign button { padding: 5px 8px; }

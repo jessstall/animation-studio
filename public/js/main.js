@@ -411,6 +411,11 @@ function fontOptions(cur) {
   return h + `<option value="__upload">Upload a font file…</option>`;
 }
 
+function alignIcon(a) {
+  const ys = [3, 7, 11, 15], ws = [14, 9, 14, 9];
+  const x = (w) => a === 'left' ? 1 : a === 'right' ? 15 - w : (16 - w) / 2;
+  return `<svg width="16" height="16" viewBox="0 0 16 16" style="display:block">${ys.map((y, i) => `<rect x="${x(ws[i])}" y="${y}" width="${ws[i]}" height="1.6" rx=".8" fill="currentColor"/>`).join('')}</svg>`;
+}
 function textSection(L) {
   const r = styleAt(L, lastRange);
   return `<div class="toolbar">
@@ -421,6 +426,7 @@ function textSection(L) {
       <input type="number" id="tbSize" min="6" max="800" value="${r.size}" title="Size (px)">
       <input type="color" id="tbColor" value="${r.color}" title="Colour">
       ${SWATCHES.map(c => `<button class="tb sw" data-sw="${c}" title="${c}" style="background:${c};min-width:20px;height:20px;padding:0;border-radius:50%"></button>`).join('')}
+      <div class="seg small tbalign" id="tbAlign">${[['left', 'Align left'], ['center', 'Centre'], ['right', 'Align right']].map(([a, t]) => `<button data-al="${a}" title="${t}" class="${L.align === a ? 'on' : ''}">${alignIcon(a)}</button>`).join('')}</div>
     </div>
     <div id="editor" class="editor" contenteditable="true" spellcheck="false"></div>
     <p class="note">Select some words to style just those (font, bold, italic, size, colour). With nothing selected, changes apply to the whole text.</p>`;
@@ -553,7 +559,7 @@ function renderInspector() {
       <div class="subhead">Outro — going out</div>${phaseBody(L, 'out')}`);
   box.innerHTML = h;
   box.scrollTop = scroll;
-  if (L.type === 'text') { const ed = $('#editor'); renderEditor(ed, L); bindEditor(ed, L); }
+  if (L.type === 'text') { const ed = $('#editor'); ed.style.textAlign = L.align || 'center'; renderEditor(ed, L); bindEditor(ed, L); }
   bindInspector(L);
 }
 
@@ -608,7 +614,7 @@ function bindInspector(L) {
     const m = L.anim.mid; m.period = r2((m.period || MID[m.preset].period) * +b.dataset.midspeed); commit(); renderInspector(); previewOnce('mid');
   });
   box.querySelectorAll('[data-preview]').forEach(b => b.onclick = () => previewOnce(b.dataset.preview === 'in' ? 'intro' : 'outro'));
-  box.querySelectorAll('#alignSeg button').forEach(b => b.onclick = () => { L.align = b.dataset.al; commit(); renderInspector(); });
+  box.querySelectorAll('#alignSeg button, #tbAlign button').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { L.align = b.dataset.al; commit(); renderInspector(); }; });
   box.querySelectorAll('#spreadSeg button').forEach(b => b.onclick = () => { L.lights.rays.spread = +b.dataset.sp; commit(); renderInspector(); });
   box.querySelectorAll('[data-line]').forEach(inp => inp.addEventListener('input', () => { const v = parseFloat(inp.value); if (isNaN(v)) return; L.lines[+inp.dataset.line][inp.dataset.lk] = v; commit(); }));
   const cH = $('#cH'), cV = $('#cV');
