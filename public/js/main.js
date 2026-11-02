@@ -778,6 +778,10 @@ $('#exResults').addEventListener('click', e => { const i = e.target.dataset.dl; 
 $('#exZip').onclick = async () => download(await zipResults(exResults, P), slug(P.name) + '.zip');
 
 // ---------------- suggest ----------------
+const sIn = $('#suggestInput');
+const growSuggest = () => { sIn.style.height = 'auto'; sIn.style.height = Math.min(sIn.scrollHeight + 2, 200) + 'px'; };
+sIn.addEventListener('input', growSuggest);
+sIn.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !isPhone()) { e.preventDefault(); $('#suggestForm').requestSubmit(); } });
 $('#suggestForm').onsubmit = async e => {
   e.preventDefault();
   const prompt = $('#suggestInput').value.trim(); if (!prompt) return;
