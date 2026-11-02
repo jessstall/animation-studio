@@ -29,7 +29,7 @@ The video encoder (ffmpeg.wasm core, ~32 MB) loads from jsDelivr the first time 
 
 ## Adding Will and the Way symbols
 
-Put the transparent PNG (or SVG) in `public/symbols/` and add an entry to `public/symbols/manifest.json`. Do this whenever a new course symbol is made for a Will and the Way landing page.
+Make gold (#B8892A), white and black versions of the transparent PNG (or SVG), put them in `public/symbols/gold/`, `white/` and `black/`, and add an entry for each to `public/symbols/manifest.json`. Do this whenever a new course symbol is made for a Will and the Way landing page.
 
 ## Code map
 

@@ -9,5 +9,5 @@ Owner: Jess (Will and the Way). Very particular about typography and the look of
 - Timeline = intro + mid + outro. Intro animations should finish inside the intro; the mid section may be trimmed by the video editor, so "Still" is the safe mid default.
 - WebM export uses VP8 with alpha (`libvpx`), because VP9 crashes ffmpeg.wasm. MOV uses ProRes 4444 (`prores_ks`).
 - ffmpeg core loads from jsDelivr by direct URL (blob URLs broke the ESM core). `?ffcore=<url>` overrides the base for testing.
-- When a new Will and the Way course symbol is made, add it to `public/symbols/` and `public/symbols/manifest.json`.
+- Will and the Way symbols live in `public/symbols/gold|white|black/` (gold #B8892A, white, black #111111), listed in `public/symbols/manifest.json` with a `colour`. When a new course symbol is made, add all three colours and the manifest entries. (Files in the `public/symbols/` root are kept only so older saved animations still load.)
 - Studio Pocket (her business partner's phone video editor, https://studiotheprize.netlify.app/) is where these animations get used; a shared library between the two apps is planned.

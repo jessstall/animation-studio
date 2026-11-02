@@ -1,90 +1,332 @@
 [
  {
-  "file": "will-and-the-way-mark.png",
-  "name": "Will and the Way mark"
+  "file": "gold/will-and-the-way-mark.png",
+  "name": "Will and the Way mark",
+  "colour": "gold"
  },
  {
-  "file": "top-mark.svg",
-  "name": "Will and the Way top mark"
+  "file": "gold/top-mark.svg",
+  "name": "Will and the Way top mark",
+  "colour": "gold"
  },
  {
-  "file": "footer-mark.svg",
-  "name": "Will and the Way footer mark"
+  "file": "gold/footer-mark.svg",
+  "name": "Will and the Way footer mark",
+  "colour": "gold"
  },
  {
-  "file": "path-and-purpose.png",
-  "name": "Path & Purpose"
+  "file": "gold/path-and-purpose.png",
+  "name": "Path & Purpose",
+  "colour": "gold"
  },
  {
-  "file": "find-your-soul-partner.png",
-  "name": "Find Your Soul Partner"
+  "file": "gold/find-your-soul-partner.png",
+  "name": "Find Your Soul Partner",
+  "colour": "gold"
  },
  {
-  "file": "max-out.png",
-  "name": "Max Out"
+  "file": "gold/max-out.png",
+  "name": "Max Out",
+  "colour": "gold"
  },
  {
-  "file": "qi-flow.png",
-  "name": "Qi Flow"
+  "file": "gold/qi-flow.png",
+  "name": "Qi Flow",
+  "colour": "gold"
  },
  {
-  "file": "heartspace-healing.png",
-  "name": "Heartspace Healing"
+  "file": "gold/heartspace-healing.png",
+  "name": "Heartspace Healing",
+  "colour": "gold"
  },
  {
-  "file": "dna-repair-and-activate.png",
-  "name": "DNA Repair & Activate"
+  "file": "gold/dna-repair-and-activate.png",
+  "name": "DNA Repair & Activate",
+  "colour": "gold"
  },
  {
-  "file": "trauma-clearing-and-healing.png",
-  "name": "Trauma Clearing & Healing"
+  "file": "gold/trauma-clearing-and-healing.png",
+  "name": "Trauma Clearing & Healing",
+  "colour": "gold"
  },
  {
-  "file": "get-great-sleep.png",
-  "name": "Get Great Sleep"
+  "file": "gold/get-great-sleep.png",
+  "name": "Get Great Sleep",
+  "colour": "gold"
  },
  {
-  "file": "grounding.png",
-  "name": "Grounding"
+  "file": "gold/grounding.png",
+  "name": "Grounding",
+  "colour": "gold"
  },
  {
-  "file": "optimal-testosterone.png",
-  "name": "Optimal Testosterone"
+  "file": "gold/optimal-testosterone.png",
+  "name": "Optimal Testosterone",
+  "colour": "gold"
  },
  {
-  "file": "super-saiyan.png",
-  "name": "Go Super Saiyan"
+  "file": "gold/super-saiyan.png",
+  "name": "Go Super Saiyan",
+  "colour": "gold"
  },
  {
-  "file": "super-saiyan-lit.png",
-  "name": "Go Super Saiyan (lit)"
+  "file": "gold/super-saiyan-lit.png",
+  "name": "Go Super Saiyan (lit)",
+  "colour": "gold"
  },
  {
-  "file": "sessions.png",
-  "name": "Personal Sessions"
+  "file": "gold/sessions.png",
+  "name": "Personal Sessions",
+  "colour": "gold"
  },
  {
-  "file": "intuitive-symbology.png",
-  "name": "Intuitive Symbology"
+  "file": "gold/intuitive-symbology.png",
+  "name": "Intuitive Symbology",
+  "colour": "gold"
  },
  {
-  "file": "highest-good.png",
-  "name": "Highest Good"
+  "file": "gold/highest-good.png",
+  "name": "Highest Good",
+  "colour": "gold"
  },
  {
-  "file": "safety.png",
-  "name": "Safety"
+  "file": "gold/safety.png",
+  "name": "Safety",
+  "colour": "gold"
  },
  {
-  "file": "ease.png",
-  "name": "Ease"
+  "file": "gold/ease.png",
+  "name": "Ease",
+  "colour": "gold"
  },
  {
-  "file": "checkout-a.png",
-  "name": "Flourish A"
+  "file": "gold/checkout-a.png",
+  "name": "Flourish A",
+  "colour": "gold"
  },
  {
-  "file": "checkout-b.png",
-  "name": "Flourish B"
+  "file": "gold/checkout-b.png",
+  "name": "Flourish B",
+  "colour": "gold"
+ },
+ {
+  "file": "white/will-and-the-way-mark.png",
+  "name": "Will and the Way mark",
+  "colour": "white"
+ },
+ {
+  "file": "white/top-mark.svg",
+  "name": "Will and the Way top mark",
+  "colour": "white"
+ },
+ {
+  "file": "white/footer-mark.svg",
+  "name": "Will and the Way footer mark",
+  "colour": "white"
+ },
+ {
+  "file": "white/path-and-purpose.png",
+  "name": "Path & Purpose",
+  "colour": "white"
+ },
+ {
+  "file": "white/find-your-soul-partner.png",
+  "name": "Find Your Soul Partner",
+  "colour": "white"
+ },
+ {
+  "file": "white/max-out.png",
+  "name": "Max Out",
+  "colour": "white"
+ },
+ {
+  "file": "white/qi-flow.png",
+  "name": "Qi Flow",
+  "colour": "white"
+ },
+ {
+  "file": "white/heartspace-healing.png",
+  "name": "Heartspace Healing",
+  "colour": "white"
+ },
+ {
+  "file": "white/dna-repair-and-activate.png",
+  "name": "DNA Repair & Activate",
+  "colour": "white"
+ },
+ {
+  "file": "white/trauma-clearing-and-healing.png",
+  "name": "Trauma Clearing & Healing",
+  "colour": "white"
+ },
+ {
+  "file": "white/get-great-sleep.png",
+  "name": "Get Great Sleep",
+  "colour": "white"
+ },
+ {
+  "file": "white/grounding.png",
+  "name": "Grounding",
+  "colour": "white"
+ },
+ {
+  "file": "white/optimal-testosterone.png",
+  "name": "Optimal Testosterone",
+  "colour": "white"
+ },
+ {
+  "file": "white/super-saiyan.png",
+  "name": "Go Super Saiyan",
+  "colour": "white"
+ },
+ {
+  "file": "white/super-saiyan-lit.png",
+  "name": "Go Super Saiyan (lit)",
+  "colour": "white"
+ },
+ {
+  "file": "white/sessions.png",
+  "name": "Personal Sessions",
+  "colour": "white"
+ },
+ {
+  "file": "white/intuitive-symbology.png",
+  "name": "Intuitive Symbology",
+  "colour": "white"
+ },
+ {
+  "file": "white/highest-good.png",
+  "name": "Highest Good",
+  "colour": "white"
+ },
+ {
+  "file": "white/safety.png",
+  "name": "Safety",
+  "colour": "white"
+ },
+ {
+  "file": "white/ease.png",
+  "name": "Ease",
+  "colour": "white"
+ },
+ {
+  "file": "white/checkout-a.png",
+  "name": "Flourish A",
+  "colour": "white"
+ },
+ {
+  "file": "white/checkout-b.png",
+  "name": "Flourish B",
+  "colour": "white"
+ },
+ {
+  "file": "black/will-and-the-way-mark.png",
+  "name": "Will and the Way mark",
+  "colour": "black"
+ },
+ {
+  "file": "black/top-mark.svg",
+  "name": "Will and the Way top mark",
+  "colour": "black"
+ },
+ {
+  "file": "black/footer-mark.svg",
+  "name": "Will and the Way footer mark",
+  "colour": "black"
+ },
+ {
+  "file": "black/path-and-purpose.png",
+  "name": "Path & Purpose",
+  "colour": "black"
+ },
+ {
+  "file": "black/find-your-soul-partner.png",
+  "name": "Find Your Soul Partner",
+  "colour": "black"
+ },
+ {
+  "file": "black/max-out.png",
+  "name": "Max Out",
+  "colour": "black"
+ },
+ {
+  "file": "black/qi-flow.png",
+  "name": "Qi Flow",
+  "colour": "black"
+ },
+ {
+  "file": "black/heartspace-healing.png",
+  "name": "Heartspace Healing",
+  "colour": "black"
+ },
+ {
+  "file": "black/dna-repair-and-activate.png",
+  "name": "DNA Repair & Activate",
+  "colour": "black"
+ },
+ {
+  "file": "black/trauma-clearing-and-healing.png",
+  "name": "Trauma Clearing & Healing",
+  "colour": "black"
+ },
+ {
+  "file": "black/get-great-sleep.png",
+  "name": "Get Great Sleep",
+  "colour": "black"
+ },
+ {
+  "file": "black/grounding.png",
+  "name": "Grounding",
+  "colour": "black"
+ },
+ {
+  "file": "black/optimal-testosterone.png",
+  "name": "Optimal Testosterone",
+  "colour": "black"
+ },
+ {
+  "file": "black/super-saiyan.png",
+  "name": "Go Super Saiyan",
+  "colour": "black"
+ },
+ {
+  "file": "black/super-saiyan-lit.png",
+  "name": "Go Super Saiyan (lit)",
+  "colour": "black"
+ },
+ {
+  "file": "black/sessions.png",
+  "name": "Personal Sessions",
+  "colour": "black"
+ },
+ {
+  "file": "black/intuitive-symbology.png",
+  "name": "Intuitive Symbology",
+  "colour": "black"
+ },
+ {
+  "file": "black/highest-good.png",
+  "name": "Highest Good",
+  "colour": "black"
+ },
+ {
+  "file": "black/safety.png",
+  "name": "Safety",
+  "colour": "black"
+ },
+ {
+  "file": "black/ease.png",
+  "name": "Ease",
+  "colour": "black"
+ },
+ {
+  "file": "black/checkout-a.png",
+  "name": "Flourish A",
+  "colour": "black"
+ },
+ {
+  "file": "black/checkout-b.png",
+  "name": "Flourish B",
+  "colour": "black"
  }
 ]

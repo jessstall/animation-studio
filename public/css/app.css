@@ -180,3 +180,9 @@ button { white-space: nowrap; }
   .layers li button { display: none; padding: 1px 3px; }
   .layers li:hover button { display: inline-block; }
 }
+
+.symcol { margin-bottom: 10px; }
+.symcol button { flex: 1; }
+.symgrid .sym { padding: 8px 8px 16px; }
+.symgrid .sym.light { background: #d9d6cf; }
+.symgrid .sym.light span { color: #555; }

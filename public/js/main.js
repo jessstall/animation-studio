@@ -179,15 +179,21 @@ async function addImageFile(f) { await addImageFrom(await readDataURL(f), f.name
 
 // ---------------- symbols ----------------
 let symbols = [];
+let symColour = localStorage.getItem('as-symcol') || 'gold';
 async function loadSymbols() {
   try { symbols = await (await fetch('symbols/manifest.json')).json(); } catch { symbols = []; }
-  $('#symGrid').innerHTML = symbols.map((s, i) => `<div class="sym" data-i="${i}" title="${esc(s.name)}"><img src="symbols/${esc(s.file)}" alt="" style="${s.file.endsWith('.svg') ? 'filter:invert(70%) sepia(40%) saturate(600%) hue-rotate(5deg)' : ''}"></div>`).join('');
+  renderSymbols();
   renderUserSymbols();
 }
+function renderSymbols() {
+  $('#symColour').innerHTML = ['gold', 'white', 'black'].map(c => `<button data-c="${c}" class="${c === symColour ? 'on' : ''}">${c[0].toUpperCase() + c.slice(1)}</button>`).join('');
+  $('#symGrid').innerHTML = symbols.map((s, i) => s.colour !== symColour ? '' : `<div class="sym ${s.colour === 'black' ? 'light' : ''}" data-i="${i}" title="${esc(s.name)}"><img src="symbols/${esc(s.file)}" alt="" loading="lazy"><span>${esc(s.name)}</span></div>`).join('');
+}
+$('#symColour').addEventListener('click', e => { const c = e.target.dataset.c; if (!c) return; symColour = c; localStorage.setItem('as-symcol', c); renderSymbols(); });
 $('#symGrid').addEventListener('click', e => {
   const d = e.target.closest('.sym'); if (!d) return;
   const s = symbols[+d.dataset.i];
-  addImageFrom('symbols/' + s.file, s.name, s.file.endsWith('.svg') ? '#C9A24F' : '');
+  addImageFrom('symbols/' + s.file, s.name);
 });
 async function renderUserSymbols() {
   const list = await store.all('symbols').catch(() => []);
