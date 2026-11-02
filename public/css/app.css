@@ -277,3 +277,14 @@ button { white-space: nowrap; }
   .effgrid .eff .x { display: block; }
   .mtabs button { font-size: 13px; padding: 11px 2px; }
 }
+@media (max-width: 760px) {
+  /* Suggest: choice + button first, text box under them */
+  .suggest select { order: 1; }
+  .suggest #suggestBtn { order: 2; }
+  .suggest textarea { order: 3; max-height: 32svh; }
+  /* while typing, the pinned preview shrinks so the keyboard and the box both fit */
+  body.typing .stage { height: 20svh; min-height: 120px; }
+  body.typing .transport { display: none; }
+  .stage { transition: height .2s ease; }
+}
+@media (max-width: 760px) { body.typing #overlay { opacity: 0; } }

@@ -1000,6 +1000,10 @@ function setMTab(m) {
   document.body.dataset.m = m;
   $$('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
 }
+// phones: shrink the pinned preview while typing so the keyboard doesn't hide everything
+const typingField = el => el && el.matches && el.matches('textarea, select, [contenteditable="true"], input:not([type=range]):not([type=checkbox]):not([type=color])') && !el.closest('.top, .viewer, dialog');
+document.addEventListener('focusin', e => { if (isPhone() && typingField(e.target)) { document.body.classList.add('typing'); setTimeout(() => e.target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 250); } });
+document.addEventListener('focusout', () => setTimeout(() => { if (!typingField(document.activeElement)) document.body.classList.remove('typing'); }, 150));
 $('#mtabs').addEventListener('click', e => { const m = e.target.dataset.m; if (m) { setMTab(m); if (m === 'effects') renderEffects(); } });
 setMTab('edit');
 
