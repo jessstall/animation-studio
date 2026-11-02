@@ -395,6 +395,7 @@ function phaseBody(L, phase) {
     <div class="row"><label>Order</label><select data-k="anim.${phase}.dir" class="grow">${[['forward', 'First to last'], ['reverse', 'Last to first'], ['center', 'From the centre out'], ['edges', 'From the edges in'], ['random', 'Random']].map(([v, n]) => `<option value="${v}" ${a.dir === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div>` : ''}
     ${num(isOut ? 'Starts (s into outro)' : 'Starts at (s)', `anim.${phase}.start`, 0.05, 'min="0"')}${num(L.type === 'text' && !special && a.by !== 'all' ? 'Each takes (s)' : 'Takes (s)', `anim.${phase}.duration`, 0.05, 'min="0.05"')}
     ${L.type === 'text' && !special && a.by !== 'all' ? num('Gap between (s)', `anim.${phase}.stagger`, 0.01, 'min="0"') : ''}
+    <div class="row"><span class="lab">Speed</span><button class="ghost" data-speed="${phase}:1.25">Slower</button><button class="ghost" data-speed="${phase}:0.8">Faster</button><span class="note">${span ? (span.end - span.start).toFixed(2) + ' s' : ''}</span></div>
     <div class="row"><label>Feel</label><select data-k="anim.${phase}.ease" class="grow"><option value="">Preset default</option>${Object.entries(EASE_NAMES).map(([k, n]) => `<option value="${k}" ${a.ease === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
     ${a.preset === 'custom' ? customBody(L, phase) : ''}
     `}${warn}
@@ -412,6 +413,7 @@ function midBody(L) {
   const def = MID[m.preset] || MID.none;
   return `<div class="presets">${MIDS.map(x => `<button data-mid="${x.id}" class="${m.preset === x.id ? 'on' : ''}">${x.name}</button>`).join('')}</div>
     ${m.preset === 'none' ? '<p class="note">Still is the safest choice if the mid section will be trimmed in the edit: any cut joins the outro seamlessly.</p>' : `
+    <div class="row"><span class="lab">Speed</span><button class="ghost" data-midspeed="1.25">Slower</button><button class="ghost" data-midspeed="0.8">Faster</button></div>
     ${slider('Strength', 'anim.mid.amount', 0.1, 3, 0.05)}
     <div class="row"><label>Cycle s</label><input type="number" data-k="anim.mid.period" step="0.1" min="0" value="${m.period || def.period}"><span class="note">${m.preset === 'rotate' ? 'seconds per full turn' : 'seconds per cycle'}</span></div>
     ${['pulse', 'glow', 'shimmer'].includes(m.preset) ? color('Glow colour', 'anim.mid.color') : ''}
@@ -437,6 +439,29 @@ function lightBody(L) {
     <div class="pair">${num('X', 'lights.rays.x')}${num('Y', 'lights.rays.y')}</div>` : ''}
     <p class="note">${L.type === 'light' ? 'This light fades and grows with its own intro and outro.' : 'Lights sit behind this layer and come and go with it.'}</p>`;
 }
+
+const r2 = v => Math.round(v * 100) / 100;
+function scalePhase(L, phase, f) {
+  const a = L.anim[phase];
+  a.duration = Math.max(0.05, r2(a.duration * f)); a.stagger = r2((a.stagger || 0) * f); a.start = r2((a.start || 0) * f);
+  if (L.type === 'text') for (const ln of L.lines) { if (phase === 'in') ln.delayIn = r2((ln.delayIn || 0) * f); else ln.delayOut = r2((ln.delayOut || 0) * f); }
+}
+// stretch the intro/outro if an animation no longer fits
+function fitSections(L) {
+  const a = phaseSpan(L, 'in', P); if (a && a.end > P.sections.intro) { const extra = Math.ceil((a.end - P.sections.intro) * 10) / 10; P.sections.intro = r2(P.sections.intro + extra); }
+  const b = phaseSpan(L, 'out', P); if (b && b.end > totalDuration(P)) P.sections.outro = r2(P.sections.outro + Math.ceil((b.end - totalDuration(P)) * 10) / 10);
+}
+function scaleAll(f) {
+  for (const k of ['intro', 'mid', 'outro']) P.sections[k] = r2(P.sections[k] * f);
+  for (const L of P.layers) {
+    scalePhase(L, 'in', f); scalePhase(L, 'out', f);
+    const m = L.anim.mid; if (m.preset !== 'none') m.period = r2((m.period || MID[m.preset].period) * f);
+    if (L.lights?.rays) L.lights.rays.turn = r2(L.lights.rays.turn / f);
+  }
+  commit(); renderInspector(); range = 'full'; syncRangeButtons(); playFromStart();
+}
+$('#allSlower').onclick = () => scaleAll(1.25);
+$('#allFaster').onclick = () => scaleAll(0.8);
 
 function renderInspector() {
   const box = $('#inspector'); const scroll = box.scrollTop;
@@ -509,6 +534,14 @@ function bindInspector(L) {
   box.querySelectorAll('[data-mid]').forEach(b => b.onclick = () => {
     const m = L.anim.mid; m.preset = b.dataset.mid; m.period = 0; m.amount = 1; m.color = MID[m.preset]?.color || m.color;
     commit(); renderInspector(); previewOnce('mid');
+  });
+  box.querySelectorAll('[data-speed]').forEach(b => b.onclick = () => {
+    const [phase, f] = b.dataset.speed.split(':');
+    scalePhase(L, phase, +f); fitSections(L); commit(); renderInspector();
+    previewOnce(phase === 'in' ? 'intro' : 'outro');
+  });
+  box.querySelectorAll('[data-midspeed]').forEach(b => b.onclick = () => {
+    const m = L.anim.mid; m.period = r2((m.period || MID[m.preset].period) * +b.dataset.midspeed); commit(); renderInspector(); previewOnce('mid');
   });
   box.querySelectorAll('[data-preview]').forEach(b => b.onclick = () => previewOnce(b.dataset.preview === 'in' ? 'intro' : 'outro'));
   box.querySelectorAll('#alignSeg button').forEach(b => b.onclick = () => { L.align = b.dataset.al; commit(); renderInspector(); });

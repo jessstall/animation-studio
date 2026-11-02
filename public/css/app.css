@@ -186,3 +186,6 @@ button { white-space: nowrap; }
 .symgrid .sym { padding: 8px 8px 16px; }
 .symgrid .sym.light { background: #d9d6cf; }
 .symgrid .sym.light span { color: #555; }
+
+.speedall { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.speedall button, [data-speed], [data-midspeed] { padding: 3px 10px; font-size: 12px; }
