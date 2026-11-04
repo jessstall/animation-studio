@@ -599,7 +599,7 @@ function snrAll(vs,bs){const sr=vs.sampleRate,v0=mono(vs),b0=mono(bs),hop=Math.r
 function monoLoss(b){const l=b.getChannelData(0),r=b.getChannelData(Math.min(1,b.numberOfChannels-1));let m=0,s=0;for(let i=0;i<l.length;i+=3){const a=l[i],c=r[i];m+=(a+c)*(a+c)/4;s+=(a*a+c*c)/2}return s<1e-12?0:10*Math.log10(m/s+1e-12)}
 
 /* ============ long files: read big recordings in pieces instead of decoding them whole ============ */
-const LONG_MIN=900; /* seconds: files longer than this are streamed */
+const PHONE=matchMedia('(pointer:coarse)').matches,LONG_MIN=PHONE?240:900,REF_MAX=PHONE?600:1500; /* seconds: files longer than LONG_MIN are streamed in pieces (phones have far less memory per page); the reference is decoded whole, so it has its own cap */
 const rdB=async(f,a,b)=>new Uint8Array(await f.slice(a,Math.min(f.size,b)).arrayBuffer());
 const u32=(u,o)=>(u[o]*16777216)+(u[o+1]<<16)+(u[o+2]<<8)+u[o+3];
 const tag=(u,o)=>String.fromCharCode(u[o],u[o+1],u[o+2],u[o+3]);
@@ -711,10 +711,10 @@ function cardSet(k,name,buf){const el=$('lc-'+k);if(k!=='ref')S.edl[k]=[[0,buf.d
 async function setLayer(k,file){if(!file)return;const el=$('lc-'+k),fn=el.querySelector('.fn');fn.textContent='Reading…';
   try{if(dc().state==='suspended')dc().resume();const m=await probeFile(file);
     if(m&&m.dur>LONG_MIN&&k!=='ref'){const V=await analyzeLong(file,m,p=>{fn.textContent='Reading '+Math.round(p*100)+'%'});S.src[k]={name:file.name,buf:V};cardSet(k,file.name,V);PF[k]=file;if(!S.built)saveFileBlob(k,file);saveMeta(k,V)}
-    else{if(m&&m.dur>LONG_MIN&&k==='ref')throw new Error('long ref');if(!m&&file.size>150e6)throw new Error('format');
+    else{if(m&&m.dur>REF_MAX&&k==='ref')throw new Error('long ref');if(!m&&file.size>150e6)throw new Error('format');
       const buf=await dc().decodeAudioData(await file.arrayBuffer());S.src[k]={name:file.name,buf};cardSet(k,file.name,buf);PF[k]=file;if(!S.built)saveFileBlob(k,file);delMeta(k)}
     if(S.built)$('rebuildhint').textContent='New file added. Press Build first mix again to use it. This resets your Trim and Mix edits.'}
-  catch(e){fn.textContent=e.message==='long ref'?'Reference must be under 25 minutes.':e.message==='format'?'This long file needs to be WAV, MP3 or M4A.':'Could not read this file. Try WAV, MP3 or M4A.'}
+  catch(e){fn.textContent=e.message==='long ref'?'Reference must be under '+Math.round(REF_MAX/60)+' minutes.':e.message==='format'?'This long file needs to be WAV, MP3 or M4A.':'Could not read this file. Try WAV, MP3 or M4A.'}
   ready()}
 function ready(){$('build').disabled=!S.src.voice||S.phase==='building';$('build').textContent=S.built?'Rebuild first mix':'Build first mix'}
 
@@ -1185,7 +1185,14 @@ async function autosave(){if(S.phase==='building'||S.phase==='restoring'||S.phas
 addEventListener('unhandledrejection',e=>{try{e.preventDefault()}catch(_){}});addEventListener('error',()=>{});
 setInterval(autosave,1500);addEventListener('visibilitychange',()=>{if(document.hidden)autosave()});addEventListener('pagehide',autosave);
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-async function restoreSession(){S.phase='restoring';let st=null;const files={};
+const CRASHK='four-restoring',lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
+function restoreBanner(){const el=$('savewarn');el.hidden=false;el.innerHTML='<b style="color:var(--fg)">Your last session didn’t reopen.</b> The phone most likely ran out of memory loading the audio. <div class="row" style="margin-top:10px"><button id="rs-try" class="sm">Try again</button><button id="rs-fresh" class="go sm">Start fresh</button></div>';el.className='card stack';el.style.marginBottom='18px';
+  $('rs-try').onclick=()=>{lsSet(CRASHK,null);location.reload()};$('rs-fresh').onclick=async()=>{try{await DB.clear()}catch(e){}lsSet(CRASHK,null);location.reload()}}
+async function restoreSession(){
+  if(new URLSearchParams(location.search).has('fresh')){try{await DB.clear()}catch(e){}lsSet(CRASHK,null);history.replaceState(null,'',location.pathname);return}
+  if(lsGet(CRASHK)==='1'){restoreBanner();return}
+  lsSet(CRASHK,'1');try{await restoreInner()}finally{setTimeout(()=>lsSet(CRASHK,null),10000)}}
+async function restoreInner(){S.phase='restoring';let st=null;const files={};
   try{const x=await DB.get('state');st=x?JSON.parse(x):null;for(const k of [...KEYS,'ref']){const f=await DB.get('file:'+k);if(f&&f.blob)files[k]=f}}catch(e){S.phase='idle';return}
   const ks=Object.keys(files);if(!ks.length){S.phase='idle';return}
   show('s-busy');prog(.05,'Restoring your session');await tick();
