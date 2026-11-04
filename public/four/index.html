@@ -17,7 +17,8 @@ body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-body)}
 *{box-sizing:border-box}
 .wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 72px}
 header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-block:6px 22px;border-bottom:1px solid var(--line);margin-bottom:26px}
-.logo{font:700 22px/1 var(--f-disp);letter-spacing:.32em}.logo b{color:var(--ac)}
+.logo{font:700 22px/1 var(--f-disp);letter-spacing:.32em}
+.brandrow{display:flex;align-items:center;gap:6px}.brandrow .sym{height:27px;width:auto;display:block;margin-top:-3px}.logo b{color:var(--ac)}
 .tag{color:var(--mu);font-size:13px}
 .steps{display:flex;gap:4px;flex-wrap:wrap}
 .steps button{font:600 11px/1 var(--f-num);letter-spacing:.14em;text-transform:uppercase;color:var(--mu);background:none;border:1px solid transparent;padding:9px 12px;border-radius:8px}
@@ -151,7 +152,7 @@ html,body{overflow-x:hidden;max-width:100%}
 
 <div class="wrap">
 <header>
-  <div class="logo">F<b>O</b>UR</div>
+  <div class="brandrow"><div class="logo">F<b>O</b>UR</div><img class="sym" src="/four/icons/symbol-gold.png" alt=""></div>
   <nav class="steps" aria-label="Steps"><button id="st-load" class="on" data-go="load">Load</button><button id="st-trim" data-go="trim">Trim</button><button id="st-mix" data-go="mix">Mix</button><button id="st-check" data-go="check">Check</button><button id="st-run" data-go="run">Run</button></nav>
 </header>
 <div class="hint" id="savewarn" hidden>Autosave is not available in this view, so closing the page will lose your work.</div>
