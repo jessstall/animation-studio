@@ -235,6 +235,7 @@ html,body{overflow-x:hidden;max-width:100%}
   <div class="card" id="tonebox" hidden><canvas id="tonecv"></canvas></div>
   <span id="winlab" hidden></span>
   <div class="prevrow"><span class="lab" style="margin:0">Export</span><div class="chips" id="prevs"></div></div>
+  <div class="prevrow"><span class="lab" style="margin:0">Format</span><div class="chips" id="fmts"></div></div>
   <button class="go" id="approve">Approve and render the full mix</button>
   <div class="err" id="err2"></div>
   <button class="ghost" id="reset">Reset · clear everything and start again</button>
@@ -977,7 +978,8 @@ $('add-btn').onclick=()=>{const k=$('add-src').value,fx=$('add-fx').value,L=mkLa
 /* ============ check tab ============ */
 const P={src:'four',pos:0};
 function sliderRange(){const mx=Math.max(0,Math.floor(S.total-S.win.len));S.win.start=clamp(S.win.start??Math.max(0,S.lead-4),0,mx);$('wstart').max=mx;$('wstart').value=S.win.start;$('wso').textContent=fmtT(S.win.start)}
-function buildPrev(){const opts=[[0,'Full'],[10,'10 s'],[30,'30 s'],[60,'1 min'],[120,'2 min']].filter(([v])=>!v||v<S.total-1);if(S.prev&&S.prev>=S.total-1)S.prev=0;
+function buildFmt(){if(!S.fmt)S.fmt=lsGet('four-fmt')||'mp3';$('fmts').innerHTML=[['mp3','MP3 · 320 kbps'],['wav','WAV · 24-bit']].map(([v,n])=>`<button class="chip${v===S.fmt?' on':''}" data-v="${v}">${n}</button>`).join('');$('fmts').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.fmt=b.dataset.v;lsSet('four-fmt',S.fmt);buildFmt()})}
+function buildPrev(){buildFmt();const opts=[[0,'Full'],[10,'10 s'],[30,'30 s'],[60,'1 min'],[120,'2 min']].filter(([v])=>!v||v<S.total-1);if(S.prev&&S.prev>=S.total-1)S.prev=0;
   $('prevs').innerHTML=opts.map(([v,n])=>`<button class="chip${v===S.prev?' on':''}" data-v="${v}">${n}</button>`).join('');
   $('prevs').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.prev=+b.dataset.v;buildPrev()});
   const o=opts.find(x=>x[0]===S.prev);$('approve').textContent=S.prev&&o?`Render ${o[1]} preview`:'Approve and render the full mix'}
@@ -1033,39 +1035,62 @@ let LONG_OUT=240,LONG_CH=90;const WAVMAX=1800;
 function blockE(m,c0,nc){const step=Math.round(.1*SR),nS=Math.floor(nc/step),E=new Float64Array(nS);for(let c=0;c<Math.min(2,m.numberOfChannels);c++){const y=kw(m.getChannelData(c));for(let k=0;k<nS;k++){let s=0;for(let i=c0+k*step,e=i+step;i<e;i++)s+=y[i]*y[i];E[k]+=s/step}}return E}
 function lufsE(E){const nS=E.length;if(nS<4)return -70;const z=[];for(let k=0;k+4<=nS;k++)z.push((E[k]+E[k+1]+E[k+2]+E[k+3])/4);const L=v=>-.691+10*Math.log10(v+1e-12),a=z.filter(v=>L(v)>-70);if(!a.length)return -70;const mm=a.reduce((s,v)=>s+v,0)/a.length,t=L(mm)-10,g=a.filter(v=>L(v)>t);if(!g.length)return -70;return L(g.reduce((s,v)=>s+v,0)/g.length)}
 const catF=(arrs)=>{let n=0;for(const a of arrs)n+=a.length;const o=new Float64Array(n);let p=0;for(const a of arrs){o.set(a,p);p+=a.length}return o};
-async function renderLongOut(pl,onp){const total=pl||S.total,CH=LONG_CH,PRE=6,POST=4,nC=Math.ceil(total/CH),eq=S.eq?S.eq.map(v=>v*S.matchAmt):null,wantWav=total<=WAVMAX,br=total>3600?192:320;await loadLame();
+/* ============ finished file goes to the phone's storage as it is made, not into memory ============
+   A 25-minute 24-bit WAV is about half a gigabyte: held in memory, iPhone Safari kills the page. Writing each piece to the
+   browser's private file storage (OPFS, through a small worker) keeps memory flat at any length. Falls back to memory if unavailable. */
+const OWSRC=`let root=null;const H={};onmessage=async e=>{const {id,op,name,buf}=e.data;try{if(!root)root=await navigator.storage.getDirectory();
+ if(op==='open'){if(H[name]){H[name].h.close();delete H[name]}const fh=await root.getFileHandle(name,{create:true}),h=await fh.createSyncAccessHandle();h.truncate(0);H[name]={h,pos:0}}
+ else if(op==='write'){const x=H[name],u=new Uint8Array(buf);let o=0;while(o<u.length){const w=x.h.write(u.subarray(o),{at:x.pos});if(!w)throw new Error('QuotaExceededError: storage full');o+=w;x.pos+=w}}
+ else if(op==='close'){const x=H[name];if(x){x.h.flush();x.h.close();delete H[name]}}
+ else if(op==='del'){if(H[name]){H[name].h.close();delete H[name]}try{await root.removeEntry(name)}catch(_){}}
+ postMessage({id})}catch(err){postMessage({id,err:String(err&&(err.name+': '+err.message)||err)})}}`;
+let OW=null,OWid=0,DISK=null;const OWcb=new Map();
+function owCall(m,tr){if(!OW){OW=new Worker(URL.createObjectURL(new Blob([OWSRC],{type:'text/javascript'})));OW.onmessage=e=>{const c=OWcb.get(e.data.id);if(c){OWcb.delete(e.data.id);e.data.err?c.rej(new Error(e.data.err)):c.res()}};OW.onerror=()=>{for(const c of OWcb.values())c.rej(new Error('writer stopped'));OWcb.clear()}}
+  return new Promise((res,rej)=>{const id=++OWid;OWcb.set(id,{res,rej});OW.postMessage({...m,id},tr||[])})}
+async function diskOK(){if(DISK!==null)return DISK;try{if(!navigator.storage||!navigator.storage.getDirectory)throw 0;await owCall({op:'open',name:'four-probe'});await owCall({op:'write',name:'four-probe',buf:new Uint8Array([1,2,3]).buffer});await owCall({op:'close',name:'four-probe'});await owCall({op:'del',name:'four-probe'});DISK=true}catch(e){DISK=false}return DISK}
+const diskFile=async(name,type)=>{const root=await navigator.storage.getDirectory(),f=await (await root.getFileHandle(name)).getFile();return new File([f],name,{type})};
+const wavHead=bytes=>{const h=new ArrayBuffer(44),dv=new DataView(h),w=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i))};w(0,'RIFF');dv.setUint32(4,36+bytes,true);w(8,'WAVE');w(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,2,true);dv.setUint32(24,SR,true);dv.setUint32(28,SR*6,true);dv.setUint16(32,6,true);dv.setUint16(34,24,true);w(36,'data');dv.setUint32(40,bytes,true);return new Uint8Array(h)};
+async function renderLongOut(pl,onp,fmtW){const total=pl||S.total,CH=LONG_CH,PRE=6,POST=4,nC=Math.ceil(total/CH),eq=S.eq?S.eq.map(v=>v*S.matchAmt):null,disk=await diskOK();
+  const wantWav=fmtW==='wav'&&(disk||total<=WAVMAX),wantMp3=!wantWav,br=disk||total<=3600?320:192;if(wantMp3)await loadLame();
   const piece=async(a,b,last)=>{const m=await renderMix({from:a-PRE,to:b+POST});if(eq)applyEq(m,eq);return{m,c0:Math.round(PRE*SR),n:Math.round((b-a)*SR),last}},chunk=i=>piece(i*CH,Math.min(total,i*CH+CH),i===nC-1);
-  const E=[];if(total>1800){const nW=14,WLn=20;for(let w=0;w<nW;w++){const a=clamp(Math.floor((w+.5)*total/nW/.1)*.1-WLn/2,0,total-WLn),{m,c0,n}=await piece(a,a+WLn,false);E.push(blockE(m,c0,n));onp(.08*(w+1)/nW,'Checking loudness');await tick()}}
-  else for(let i=0;i<nC;i++){const {m,c0,n}=await chunk(i);E.push(blockE(m,c0,n));onp(.3*(i+1)/nC,'Measuring loudness · '+fmtM((i+1)*CH>total?total:(i+1)*CH)+' of '+fmtM(total));await tick()}
-  const l0=lufsE(catF(E));let g=l0>-60?clamp(TARGET-l0,-24,18):0,ceil=-1.5,res=null;
-  for(let it=0;it<3;it++){const enc=new lamejs.Mp3Encoder(2,SR,br),mp3=[],wav=[],E2=[];let tp=-99,count=0;
+  const long=total>1800,M0=long?.08:.3;
+  const E=[];if(long){const nW=14,WLn=20;for(let w=0;w<nW;w++){const a=clamp(Math.floor((w+.5)*total/nW/.1)*.1-WLn/2,0,total-WLn),{m,c0,n}=await piece(a,a+WLn,false);E.push(blockE(m,c0,n));onp(M0*(w+1)/nW,'Checking loudness');await tick()}}
+  else for(let i=0;i<nC;i++){const {m,c0,n}=await chunk(i);E.push(blockE(m,c0,n));onp(M0*(i+1)/nC,'Measuring loudness · '+fmtM((i+1)*CH>total?total:(i+1)*CH)+' of '+fmtM(total));await tick()}
+  const l0=lufsE(catF(E));let g=l0>-60?clamp(TARGET-l0,-24,18):0,ceil=-1.5,res=null;const FN=wantWav?'four-out.wav':'four-out.mp3';
+  for(let it=0;it<3;it++){const enc=wantMp3?new lamejs.Mp3Encoder(2,SR,br):null,mem=[],E2=[];let tp=-99,count=0;
+    if(disk){await owCall({op:'del',name:'four-out.wav'});await owCall({op:'del',name:'four-out.mp3'});await owCall({op:'open',name:FN});if(wantWav)await owCall({op:'write',name:FN,buf:wavHead(0).buffer})}
+    const put=async u=>{if(disk){const c=u.byteOffset===0&&u.byteLength===u.buffer.byteLength?u.buffer:u.slice().buffer;await owCall({op:'write',name:FN,buf:c},[c])}else mem.push(u)};
     for(let i=0;i<nC;i++){const {m,c0,n,last}=await chunk(i);gainBuf(m,lin(g));limit(m,ceil);if(last&&pl){const fn=Math.min(n,Math.round(1.2*SR));for(let c=0;c<2;c++){const d=m.getChannelData(c);for(let j=0;j<fn;j++)d[c0+n-fn+j]*=Math.cos(j/fn*Math.PI/2)}}
       tp=Math.max(tp,tpDb(m));E2.push(blockE(m,c0,n));const L=m.getChannelData(0),R=m.getChannelData(1);
-      for(let j=c0;j<c0+n;j+=1152){const e=Math.min(c0+n,j+1152),a=new Int16Array(e-j),b=new Int16Array(e-j);for(let q=j;q<e;q++){a[q-j]=Math.round(clamp(L[q],-1,1)*32767);b[q-j]=Math.round(clamp(R[q],-1,1)*32767)}const d=enc.encodeBuffer(a,b);if(d.length)mp3.push(new Uint8Array(d));if(((j-c0)/1152)%500===0)await tick()}
-      if(wantWav){const u=new Uint8Array(n*6);let p=0;for(let q=c0;q<c0+n;q++){const a=Math.round(clamp(L[q],-1,1)*8388607),b=Math.round(clamp(R[q],-1,1)*8388607);u[p++]=a&255;u[p++]=(a>>8)&255;u[p++]=(a>>16)&255;u[p++]=b&255;u[p++]=(b>>8)&255;u[p++]=(b>>16)&255}wav.push(new Blob([u]))}
-      count+=n;onp(.1+.88*(i+1)/nC,(it?'Fine-tuning · ':'Mixing and saving · ')+fmtM(Math.min(total,(i+1)*CH))+' of '+fmtM(total));await tick()}
-    const d=enc.flush();if(d.length)mp3.push(new Uint8Array(d));const lu=lufsE(catF(E2));res={lufs:lu,peak:tp,mp3:new Blob(mp3,{type:'audio/mpeg'}),wav:null,br,dur:count/SR};
-    if(wantWav){const bytes=count*6,h=new ArrayBuffer(44),dv=new DataView(h),w=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i))};w(0,'RIFF');dv.setUint32(4,36+bytes,true);w(8,'WAVE');w(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,2,true);dv.setUint32(24,SR,true);dv.setUint32(28,SR*6,true);dv.setUint16(32,6,true);dv.setUint16(34,24,true);w(36,'data');dv.setUint32(40,bytes,true);res.wav=new Blob([h,...wav],{type:'audio/wav'})}
-    if((Math.abs(lu-TARGET)<=.6&&tp<=-1)||it===2)break;
-    if(lu>-60&&Math.abs(lu-TARGET)>.5)g+=clamp(TARGET-lu,-6,6);if(tp>-1)ceil-=tp+1.05}
+      if(wantMp3){const parts=[];let sz=0;for(let j=c0;j<c0+n;j+=1152){const e=Math.min(c0+n,j+1152),a=new Int16Array(e-j),b=new Int16Array(e-j);for(let q=j;q<e;q++){a[q-j]=Math.round(clamp(L[q],-1,1)*32767);b[q-j]=Math.round(clamp(R[q],-1,1)*32767)}const d=enc.encodeBuffer(a,b);if(d.length){parts.push(new Uint8Array(d));sz+=d.length}if(((j-c0)/1152)%500===0)await tick()}
+        const u=new Uint8Array(sz);let o=0;for(const x of parts){u.set(x,o);o+=x.length}await put(u)}
+      else{const u=new Uint8Array(n*6);let p=0;for(let q=c0;q<c0+n;q++){const a=Math.round(clamp(L[q],-1,1)*8388607),b=Math.round(clamp(R[q],-1,1)*8388607);u[p++]=a&255;u[p++]=(a>>8)&255;u[p++]=(a>>16)&255;u[p++]=b&255;u[p++]=(b>>8)&255;u[p++]=(b>>16)&255}await put(u)}
+      count+=n;const f=(it+(i+1)/nC)/(it+1);onp(M0+(.98-M0)*(it?.94+.06*f:(i+1)/nC),(it?'Fine-tuning the loudness · ':'Mixing and saving · ')+fmtM(Math.min(total,(i+1)*CH))+' of '+fmtM(total));await tick()}
+    if(wantMp3){const d=enc.flush();if(d.length)await put(new Uint8Array(d))}
+    const lu=lufsE(catF(E2));res={lufs:lu,peak:tp,mp3:null,wav:null,br,dur:count/SR,fmt:wantWav?'wav':'mp3'};
+    if(disk){await owCall({op:'close',name:FN});}
+    const ok=(Math.abs(lu-TARGET)<=.6&&tp<=-1)||it===2;
+    if(ok){if(disk){let f=await diskFile(FN,wantWav?'audio/wav':'audio/mpeg');if(wantWav){/* patch the real length into the header */const hdr=wavHead(count*6);f=new File([hdr,f.slice(44)],FN,{type:'audio/wav'})}res[wantWav?'wav':'mp3']=f}
+      else res[wantWav?'wav':'mp3']=wantWav?new Blob([wavHead(count*6),...mem],{type:'audio/wav'}):new Blob(mem,{type:'audio/mpeg'});break}
+    mem.length=0;if(lu>-60&&Math.abs(lu-TARGET)>.5)g+=clamp(TARGET-lu,-6,6);if(tp>-1)ceil-=tp+1.05}
   return res}
 let WL=null;async function keepAwake(on){try{if(on&&navigator.wakeLock)WL=await navigator.wakeLock.request('screen');else if(WL){await WL.release();WL=null}}catch(e){}}
 const fmtM=t=>Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');
 $('approve').onclick=async()=>{if(S.phase==='running')return go('run');S.phase='running';stopPlay();$('err3').textContent='';show('s-run');dial($('dial2'),0);$('p2').textContent='0%';$('runmsg').textContent='Mixing the full file';
   const t0=performance.now(),tk=setInterval(()=>{$('tm').textContent=fmt((performance.now()-t0)/1000)},500);
   const pl=S.prev&&S.prev<S.total?S.prev:0;
-  try{if((pl||S.total)>LONG_OUT){await keepAwake(true);$('runmsg').textContent='Mixing in pieces. Keep this screen open.';const r=await renderLongOut(pl,(p,m)=>{dial($('dial2'),p);$('p2').textContent=Math.round(p*100)+'%';$('runmsg').textContent=m});await keepAwake(false);
+  try{if((pl||S.total)>LONG_OUT){await keepAwake(true);$('runmsg').textContent='Mixing in pieces. Keep this screen open.';let hi=0;lsSet('four-rendering','1');const r=await renderLongOut(pl,(p,m)=>{hi=Math.max(hi,p);dial($('dial2'),hi);$('p2').textContent=Math.round(hi*100)+'%';$('runmsg').textContent=m},S.fmt);await keepAwake(false);lsSet('four-rendering',null);
       S.out={long:true,mp3:r.mp3,wav:r.wav,br:r.br,lufs:r.lufs,peak:r.peak,dur:r.dur};S.outLen=pl||S.total;S.outTag=pl?'_'+(pl<60?pl+'s':pl/60+'min'):'';clearInterval(tk);const secs=(performance.now()-t0)/1000;S.phase='done';dial($('dial2'),1);$('p2').textContent='100%';$('dt').textContent=fmt(secs);
       $('dstats').innerHTML=`<span>Length <b>${fmtM(S.outLen)}</b></span><span>Loudness <b>${r.lufs.toFixed(1)} LUFS</b></span><span>True peak <b>${r.peak.toFixed(1)} dBTP</b></span><span>48 kHz stereo · Spotify standard</span>`;
-      $('savehint').textContent=r.wav?'':'WAV is offered up to 30 minutes. This one is MP3 only, to keep the file a size your phone can save.';$('save-wav').disabled=!r.wav;$('save-wav').textContent=r.wav?'Save WAV · 24-bit':'WAV · up to 30 min';$('save-mp3').textContent='Save MP3 · '+r.br+' kbps';S.tabNow='run';show('s-done');return}
+      $('savehint').textContent=(S.fmt==='wav'&&!r.wav?'WAV over 30 minutes needs more memory than this browser allows, so this one is MP3. ':'')+'Want the other format? Go to Check, pick it under Format and render again.';$('save-wav').hidden=!r.wav;$('save-mp3').hidden=!r.mp3;$('save-wav').disabled=false;$('save-wav').textContent='Save WAV · 24-bit';$('save-mp3').textContent='Save MP3 · '+r.br+' kbps';S.tabNow='run';show('s-done');return}
     let buf=await renderMix({from:0,to:pl||S.total,onProgress:p=>{dial($('dial2'),p*.85);$('p2').textContent=Math.round(p*85)+'%'}});
     if(pl){buf=sliceBuf(buf,0,pl);fadeOut(buf,1.2)}S.outLen=pl||S.total;S.outTag=pl?'_'+(pl<60?pl+'s':pl/60+'min'):'';
     $('runmsg').textContent='Setting loudness and peak limit';dial($('dial2'),.9);$('p2').textContent='90%';await tick();
     const eq=S.eq?S.eq.map(v=>v*S.matchAmt):null,f=finish(buf,TARGET,eq);S.out={buf:f.buf,lufs:f.lufs,peak:f.peak,dur:f.buf.duration};
     clearInterval(tk);const secs=(performance.now()-t0)/1000;S.phase='done';dial($('dial2'),1);$('p2').textContent='100%';$('dt').textContent=fmt(secs);
     $('dstats').innerHTML=`<span>Length <b>${fmtM(S.outLen)}</b></span><span>Loudness <b>${f.lufs.toFixed(1)} LUFS</b></span><span>True peak <b>${f.peak.toFixed(1)} dBTP</b></span><span>48 kHz stereo · Spotify standard</span>`;
-    $('savehint').textContent='';$('save-wav').disabled=false;$('save-wav').textContent='Save WAV · 24-bit';$('save-mp3').textContent='Save MP3 · 320 kbps';S.tabNow='run';show('s-done');persistOut()}
-  catch(e){clearInterval(tk);keepAwake(false);S.phase='ready';show('s-check');checkEnter();$('err2').textContent='Could not render the full mix: '+e.message}};
+    $('savehint').textContent='';$('save-wav').hidden=false;$('save-mp3').hidden=false;$('save-wav').disabled=false;$('save-wav').textContent='Save WAV · 24-bit';$('save-mp3').textContent='Save MP3 · 320 kbps';S.tabNow='run';show('s-done');persistOut()}
+  catch(e){clearInterval(tk);keepAwake(false);lsSet('four-rendering',null);S.phase='ready';show('s-check');checkEnter();$('err2').textContent=/quota|storage full|space/i.test(String(e&&e.message))?'Not enough free space on this phone to save the finished file. Free up some space (or choose MP3, which is much smaller) and render again.':'Could not render the full mix: '+e.message}};
 function fadeOut(b,sec){const n=Math.min(b.length,Math.round(sec*b.sampleRate));for(let c=0;c<b.numberOfChannels;c++){const d=b.getChannelData(c);for(let i=0;i<n;i++)d[b.length-n+i]*=Math.cos(i/n*Math.PI/2)}}
 function wav24(b){const n=b.length,bytes=n*6,ab=new ArrayBuffer(44+bytes),dv=new DataView(ab),u=new Uint8Array(ab),sr=b.sampleRate;const w=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i))};
   w(0,'RIFF');dv.setUint32(4,36+bytes,true);w(8,'WAVE');w(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,2,true);dv.setUint32(24,sr,true);dv.setUint32(28,sr*6,true);dv.setUint16(32,6,true);dv.setUint16(34,24,true);w(36,'data');dv.setUint32(40,bytes,true);
@@ -1190,6 +1215,7 @@ function restoreBanner(){const el=$('savewarn');el.hidden=false;el.innerHTML='<b
   $('rs-try').onclick=()=>{lsSet(CRASHK,null);location.reload()};$('rs-fresh').onclick=async()=>{try{await DB.clear()}catch(e){}lsSet(CRASHK,null);location.reload()}}
 async function restoreSession(){
   if(new URLSearchParams(location.search).has('fresh')){try{await DB.clear()}catch(e){}lsSet(CRASHK,null);history.replaceState(null,'',location.pathname);return}
+  if(lsGet('four-rendering')==='1'){lsSet('four-rendering',null);const el=$('savewarn');el.hidden=false;el.className='card stack';el.style.marginBottom='18px';el.innerHTML='<b style="color:var(--fg)">The last render stopped part-way.</b> The phone ran out of memory. FOUR now saves the finished file to the phone as it goes, so please try again.'}
   if(lsGet(CRASHK)==='1'){restoreBanner();return}
   lsSet(CRASHK,'1');try{await restoreInner()}finally{setTimeout(()=>lsSet(CRASHK,null),10000)}}
 async function restoreInner(){S.phase='restoring';let st=null;const files={};
