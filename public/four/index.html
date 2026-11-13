@@ -41,7 +41,7 @@ button.on{border-color:var(--ac);color:var(--ac)}
 .ghost{background:none;width:100%;color:var(--mu)}
 #pname{flex:1;min-width:0;background:var(--bg,#0e0f10);color:var(--tx,#eee);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit}
 #psave{background:var(--ok)!important;color:#06210f!important;border:0;font-weight:600}
-#presetload>*,#presetmix>*{min-width:0;max-width:100%}.prow{min-width:0;display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}.prow .pn{flex:1 1 0;min-width:0;overflow:hidden;display:flex;flex-direction:column}.prow .pn span{color:var(--mu);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pb{padding:8px 14px}.pb.x{padding:8px 10px}
+#presetload>*,#presetmix>*{min-width:0;max-width:100%}.prow{min-width:0;display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}.prow .pn{flex:1 1 0;min-width:0;overflow:hidden;display:flex;flex-direction:column}.prow .pn span{color:var(--mu);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pb{padding:8px 14px}.pb.used{background:#B8892A!important;border-color:#B8892A;display:inline-grid;place-items:center;min-width:58px;padding:7px 14px}.pb.used:hover{filter:brightness(1.08)}.pb.x{padding:8px 10px}
 .openproj{display:block;text-align:center;border:1px dashed var(--line);border-radius:12px;padding:14px;color:var(--mu);cursor:pointer}
 .ghost.armed{color:var(--bad);border-color:var(--bad)}
 .hint{color:var(--mu);font-size:13px}
@@ -1140,7 +1140,9 @@ async function pdbInit(){let loc=[];try{loc=(await DB.get('presets'))||[]}catch(
 async function putPreset(id,doc){if(PDB){await PDB.doc('presets/'+id).set(doc)}else{const l=PRESETS.filter(x=>x.id!==id);PRESETS=[{id,...doc},...l];try{await DB.set('presets',PRESETS)}catch(e){}renderPresets()}}
 async function delPreset(id){if(PDB)await PDB.doc('presets/'+id).delete();else{PRESETS=PRESETS.filter(x=>x.id!==id);try{await DB.set('presets',PRESETS)}catch(e){}renderPresets()}}
 const when=t=>t?new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short'})+' '+new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
-function renderPresets(){const h=PRESETS.length?PRESETS.map(p=>`<div class="prow" data-id="${p.id}"><div class="pn"><b>${esc(p.name||p.id)}</b><span>${p.auto?'saved automatically · ':''}${when(p.savedAt)}${p.voiceName?' · '+esc(p.voiceName):''}</span></div><button data-p="use" class="pb">Use</button><button data-p="del" class="pb x" title="Delete">✕</button></div>`).join(''):'<div class="hint">No presets yet. Mix something, then tap Save preset.</div>';
+let ACTIVEP=(()=>{try{return localStorage.getItem('four-preset')}catch(e){return null}})();
+const setActiveP=id=>{ACTIVEP=id;try{id?localStorage.setItem('four-preset',id):localStorage.removeItem('four-preset')}catch(e){}renderPresets()};
+function renderPresets(){const h=PRESETS.length?PRESETS.map(p=>`<div class="prow" data-id="${p.id}"><div class="pn"><b>${esc(p.name||p.id)}</b><span>${p.auto?'saved automatically · ':''}${when(p.savedAt)}${p.voiceName?' · '+esc(p.voiceName):''}</span></div>${p.id===ACTIVEP?'<button data-p="use" class="pb used" aria-label="In use" title="In use"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3.2 8.4l3 3 6.6-6.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>':'<button data-p="use" class="pb">Use</button>'}<button data-p="del" class="pb x" title="Delete">✕</button></div>`).join(''):'<div class="hint">No presets yet. Mix something, then tap Save preset.</div>';
   $('plist-load').innerHTML=h;$('plist-mix').innerHTML=h}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function applySettings(p){const sl=p.settings.lanes;S.lanes=S.lanes.filter(l=>!l.extra);
@@ -1155,7 +1157,7 @@ function applyPreset(p){if(!S.built){S.pending=p;phint('“'+p.name+'” is read
   if(p.full&&p.voiceDur&&Math.abs(p.voiceDur-dur)<1){adoptState(p.full,'mix');phint('Loaded “'+p.name+'” with your cuts and clips.')}
   else{applySettings(p);phint('Applied “'+p.name+'” levels and effects to this recording.');if(!$('s-mix').hidden)liveMix(false)}}
 document.addEventListener('click',e=>{const b=e.target.closest('button[data-p]');if(!b)return;const id=b.closest('.prow').dataset.id,p=PRESETS.find(x=>x.id===id);if(!p)return;
-  if(b.dataset.p==='use')applyPreset(p);else if(b.dataset.p==='del'){if(b.dataset.arm){delPreset(id).catch(()=>{});phint('')}else{b.dataset.arm=1;b.textContent='Delete?';setTimeout(()=>{b.dataset.arm='';b.textContent='✕'},3000)}}});
+  if(b.dataset.p==='use'){applyPreset(p);setActiveP(id)}else if(b.dataset.p==='del'){if(b.dataset.arm){delPreset(id).catch(()=>{});phint('')}else{b.dataset.arm=1;b.textContent='Delete?';setTimeout(()=>{b.dataset.arm='';b.textContent='✕'},3000)}}});
 const pname=()=>($('pname').value.trim()||(S.src.voice?S.src.voice.name.replace(/\.[^.]+$/,''):'My mix'));
 $('psave').onclick=async()=>{if(!S.built){phint('Build your mix first, then save it.');return}const n=pname();try{await putPreset(slug(n),presetDoc(n,true));phint('Saved preset “'+n+'”. '+(window.claude?'It is kept online, so it is here next time.':'It is kept in this browser. Use Save project file for a copy that holds your audio too.'))}catch(e){phint('Could not save the preset: '+(e.message||e.code||'try again'))}};
 let mirT=null;function mirror(){if(!S.built||mirT)return;mirT=setTimeout(()=>{mirT=null;const d=presetDoc('Last session',true);d.auto=true;putPreset("auto-last",d).catch(()=>{})},6000)}
@@ -1185,7 +1187,7 @@ $('proj-in').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!
   catch(err){phint('Could not open that file: '+(err.message||'try again'))}};
 
 /* ============ reset ============ */
-function resetAll(){if(S.phase==='running'||S.phase==='building'){$('err2').textContent='Wait for the current job to finish first.';return}stopPlay();DB.clear().catch(()=>{});lastSnap='';for(const k in PF)delete PF[k];
+function resetAll(){if(S.phase==='running'||S.phase==='building'){$('err2').textContent='Wait for the current job to finish first.';return}setActiveP(null);stopPlay();DB.clear().catch(()=>{});lastSnap='';for(const k in PF)delete PF[k];
   Object.assign(S,{prev:0,tp:{},mset:false,src:{},edl:{},hist:{},tr:{},lanes:[],nid:1,sel:null,selLane:null,total:1,playhead:0,built:false,phase:'idle',tsel:null,tph:0,eq:null,W:null,R:null,rv:S.rv+1,dirty:true,out:null,bgOff:0,bgAuto:0,matchAmt:.6,win:{start:null,len:30}});
   for(const k of [...KEYS,'ref']){const el=$('lc-'+k);el.classList.remove('set');el.querySelector('input').value='';el.querySelector('.fn').textContent='Add audio';el.querySelector('em').textContent='';mini(el.querySelector('canvas'),null)}
   $('err1').textContent=$('err2').textContent=$('err3').textContent='';$('rebuildhint').textContent='';ready();show('s-load')}
