@@ -1234,7 +1234,7 @@ function presetDoc(name,withFull){const d={name,savedAt:Date.now(),voiceName:S.s
   if(withFull){const f=fullState();if(JSON.stringify(f).length<200000)d.full=JSON.parse(JSON.stringify(f))}return d}
 async function pdbInit(){let loc=[];try{loc=(await DB.get('presets'))||[]}catch(e){}if(!(window.claude&&window.claude.use)&&window.FOUR_SEED){/* built-in presets: a fresh phone gets them all; a phone that already has presets gets any new built-in ones once (one you delete stays deleted) */
     const ORIG=["intros", "fysp", "qi-flow", "p-piv", "max-out-iii", "p-p-iii", "p-p-ii", "max-out-i", "path-and-purpose-i"];let seen=null;try{seen=JSON.parse(localStorage.getItem('four-seeds-seen')||'null')}catch(e){}
-    if(!seen)seen=loc.length?ORIG.slice():[];let add=window.FOUR_SEED.filter(x=>!seen.includes(x.id)&&!loc.some(y=>y.id===x.id));
+    if(!loc.length)seen=[];/* an empty list (new phone, or iPhone cleared site data to free space) always gets the built-ins back */else if(!seen)seen=ORIG.slice();let add=window.FOUR_SEED.filter(x=>!seen.includes(x.id)&&!loc.some(y=>y.id===x.id));
     if(add.length){loc=[...loc,...add].sort((a,b)=>(b.savedAt||0)-(a.savedAt||0));try{await DB.set('presets',loc)}catch(e){}}
     try{localStorage.setItem('four-seeds-seen',JSON.stringify([...new Set([...seen,...window.FOUR_SEED.map(x=>x.id)])]))}catch(e){}}PRESETS=loc;
   try{const c=window.claude&&window.claude.use?await window.claude.use('db'):null;if(c){PDB=c;c.collection('presets').onSnapshot(sn=>{PRESETS=sn.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.savedAt||0)-(a.savedAt||0));renderPresets()},()=>{})}}catch(e){}
