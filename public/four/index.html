@@ -97,6 +97,24 @@ input[type=range]{accent-color:var(--ac);min-width:0;width:100%}
 .lane{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--lc);border-radius:12px;padding:12px 14px;display:grid;gap:10px;min-width:0}
 .lane.off{opacity:.55}
 .lane .lh2{display:flex;align-items:center;gap:8px}
+.wrow{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap}
+.wd{display:flex;align-items:center;gap:10px;min-width:150px}
+.wdial{width:76px;height:76px;touch-action:none;cursor:grab;flex:none}
+.wdl{display:grid;gap:2px;font-size:13px;color:var(--mu)}.wdl output{color:var(--fg);font-family:"IBM Plex Mono",monospace;font-size:12px}
+.nrbox{flex:1;min-width:170px;display:grid;gap:8px;align-content:center}
+.nrh{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--mu)}
+.sw{width:46px;height:26px;border-radius:13px;background:#2b2d31;border:1px solid var(--line);position:relative;padding:0;cursor:pointer;transition:background .2s}
+.sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#5d6168;transition:left .2s,background .2s}
+.sw.on{background:#ff8a1f;border-color:#ff8a1f}.sw.on i{left:23px;background:#fff}
+.fd{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--mu)}.fd.off{opacity:.4}
+.fd output{font-family:"IBM Plex Mono",monospace;color:var(--fg);min-width:28px;text-align:right}
+.fdt{position:relative;flex:1;height:30px;touch-action:none;cursor:pointer}
+.fdt::before{content:"";position:absolute;left:0;right:0;top:13px;height:4px;border-radius:2px;background:#2b2d31}
+.fdf{position:absolute;left:0;top:13px;height:4px;border-radius:2px;background:#ff8a1f}
+.fdk{position:absolute;top:5px;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:#fff;box-shadow:0 1px 4px #0008}
+.tch .nrbox{grid-template-columns:auto auto;justify-content:start;align-items:center;column-gap:22px}.tch .nrh{flex-direction:column;align-items:flex-start}
+.tch .fd{flex-direction:column-reverse;justify-self:start}.tch .fdt{flex:none;width:34px;height:120px}
+.tch .fdt::before{left:15px;right:auto;top:0;bottom:0;width:4px;height:auto}.tch .fdf{left:15px;top:auto;bottom:0;width:4px;height:auto}.tch .fdk{left:7px!important;margin-left:0;margin-bottom:-10px;top:auto}
 .lane .lh2 b{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lane .lh2 button{padding:5px 9px;font:600 12px var(--f-num)}
 .lane details summary{cursor:pointer;color:var(--mu);font-size:13px}
@@ -268,7 +286,7 @@ const $=id=>document.getElementById(id);
 const SR=48000,KEYS=['voice','music','atmos','sound'];
 const NAMES={voice:'Voice',music:'Music',atmos:'Atmosphere',sound:'Sound',ref:'Reference'};
 const COL={voice:'#f0b54a',music:'#8e97ff',atmos:'#62d39c',sound:'#ff9e6e',ref:'#c9cdd4'};
-const FXN={none:'No effect',podcast:'Podcast',spaceship:'Spaceship',reverb:'Reverb',delay:'Delay'};
+const FXN={none:'No effect',raw:'Original · no processing',podcast:'Podcast',spaceship:'Spaceship',reverb:'Reverb',delay:'Delay'};
 const FXP={podcast:['Body','Presence','Squeeze'],spaceship:['Tinny','Grit','Static'],reverb:['Size','Mix','Darkness'],delay:['Time','Repeats','Mix']};
 const BANDS={buds:[60,14000],phone:[380,6000],laptop:[220,13000]};
 const TARGET=-14,GOAL=13; /* Spotify: about -14 LUFS integrated, true peak -1 dBTP or lower. GOAL = voice sits 15 dB over the background on the weakest small speaker */
@@ -457,7 +475,7 @@ const pos=()=>snd?snd.off+(snd.c.currentTime-snd.t0):0;
 
 /* ============ lanes, layout ============ */
 const lane=id=>S.lanes.find(l=>l.id==id);
-function mkLane(key,fx){const d=DEF[key],extra=fx!==undefined&&fx!==d.fx;return{id:S.nid++,key,name:NAMES[key],fx:fx===undefined?d.fx:fx,amt:extra?60:d.amt,p:[50,50,50],vol:extra&&key==='voice'?-3:d.vol,dip:d.dip,mute:false,solo:false,auto:true,eq:[0,0,0,0],comp:key==='voice'?60:0,clips:[]}}
+function mkLane(key,fx){const d=DEF[key],extra=fx!==undefined&&fx!==d.fx;return{id:S.nid++,key,name:NAMES[key],fx:fx===undefined?d.fx:fx,amt:extra?60:d.amt,p:[50,50,50],vol:extra&&key==='voice'?-3:d.vol,dip:d.dip,mute:false,solo:false,auto:true,eq:[0,0,0,0],comp:key==='voice'?60:0,wd:100,nr:false,nri:50,clips:[]}}
 function layout(L){const buf=S.tr[L.key],dur=buf.duration,vd=S.tr.voice?S.tr.voice.duration:dur,lead=S.lead,tail=S.tail;L.auto=true;
   if(L.key==='voice'){const first=S.lanes.find(l=>l.key==='voice');L.clips=first&&first!==L&&first.clips.length?first.clips.map(c=>({...c})):[{start:lead,in:0,out:dur,fi:L.clips&&L.clips.length?L.clips[0].fi:.01,fo:L.clips&&L.clips.length?L.clips[L.clips.length-1].fo:.05,g:0}];return}
   if(L.key==='sound'){L.clips=[{start:0,in:0,out:dur,fi:.3,fo:.5,g:0}];return}
@@ -509,8 +527,48 @@ function deess(chs,sr,thr,ratio){const hf=chs.map(d=>{const c=Float32Array.from(
 /* level of the speech itself (dBFS RMS over the active part), measured on a few samples of the track */
 function speechLevel(chs,sr){const n=chs[0].length,fr=Math.round(.05*sr),r=[];for(let s=0;s+fr<=n;s+=fr){let e=0;for(const d of chs)for(let i=s;i<s+fr;i++)e+=d[i]*d[i];r.push(10*Math.log10(e/(fr*chs.length)+1e-12))}
   if(r.length<4)return{lev:-30,gate:-60};const mx=Math.max(...r),a=r.filter(v=>v>mx-35);const lv=10*Math.log10(a.reduce((s,v)=>s+Math.pow(10,v/10),0)/a.length);return{lev:lv,gate:mx-35}}
+/* ============ noise clean: keeps the voice, removes hum, hiss, clicks, traffic and planes ============ */
+/* noise fingerprint of a track: for every frequency, the level it sits at when nobody is speaking */
+function nrProfile(chs,sr){const N=sr>32000?1024:512,H=N/2,n=chs[0].length,nb=N/2+1,C=chs.length,w=new Float64Array(N);for(let i=0;i<N;i++)w[i]=.5-.5*Math.cos(2*Math.PI*i/N);
+  const re=new Float64Array(N),im=new Float64Array(N),P=[];
+  for(let s=0;s+N<=n;s+=H){let e=0;for(let i=0;i<N;i++){let v=0;for(let c=0;c<C;c++)v+=chs[c][s+i];re[i]=v/C*w[i];im[i]=0;e+=re[i]*re[i]}if(e<1e-11)continue;
+    fft(re,im);const p=new Float32Array(nb);for(let k=0;k<nb;k++)p[k]=re[k]*re[k]+im[k]*im[k];P.push(p)}
+  if(P.length<20)return null;const m=P.length,col=new Float32Array(m),prof=new Array(nb);
+  const tot=P.map(p=>{let e=0;for(const v of p)e+=v;return e}).sort((a,b)=>a-b),sp=tot[Math.floor(m*.9)];
+  let pe=0;for(let k=0;k<nb;k++){for(let j=0;j<m;j++)col[j]=P[j][k];col.sort();const q=col[Math.floor(m*.15)]/.1625,md=col[Math.floor(m*.5)];prof[k]=Math.max(1e-14,Math.min(q,md));pe+=prof[k]}
+  const cap=sp*Math.pow(10,-18/10);if(pe>cap){const f=cap/pe;for(let k=0;k<nb;k++)prof[k]*=f}
+  return{N,prof}}
+/* clicks and pops: very short spikes are cut out and bridged */
+function declick(chs,sr,k){const W=Math.round(.02*sr),R=Math.max(2,Math.round(.0006*sr)),lim=10-4*k;
+  for(const d of chs){const n=d.length;if(n<W*2)continue;const e=new Float32Array(n);for(let i=2;i<n;i++){const v=d[i]-2*d[i-1]+d[i-2];e[i]=v*v}
+    let acc=0;for(let i=0;i<W;i++)acc+=e[i];let i=W;while(i<n-R-2){acc+=e[i]-e[i-W];const rms=Math.sqrt(Math.max(acc,1e-20)/W);
+      if(Math.sqrt(e[i])>lim*rms+1e-5){let j=i;while(j<n-1&&j-i<Math.round(.003*sr)&&Math.sqrt(e[j])>lim*.4*rms)j++;
+        const a=Math.max(0,i-R),b=Math.min(n-1,j+R);if(b-a<Math.round(.004*sr)){const va=d[a],vb=d[b];for(let q=a+1;q<b;q++){const t=(q-a)/(b-a);d[q]=va+(vb-va)*t}}i=b+1;continue}i++}}}
+/* the main clean-up: a spectral gate tuned around speech.
+   k 0..1 = intensity. Noise is learned from the track (and keeps learning in the pauses, so a passing car or plane is tracked too).
+   Inside the voice band the gain follows the voice; between words everything that is not voice is pulled right down. */
+function denoise(chs,sr,k,np,aux){if(!np)return;const N=np.N,H=N/4,nb=N/2+1,n=chs[0].length,C=chs.length,w=new Float64Array(N);for(let i=0;i<N;i++)w[i]=.5-.5*Math.cos(2*Math.PI*i/N);
+  const over=1+2.5*k,floor=Math.pow(10,-(10+30*k)/20),gateFloor=1-.92*k,alpha=.97,b0=Math.max(1,Math.round(500*N/sr)),b1=Math.min(nb-1,Math.round(4000*N/sr)),lo=Math.round(70*N/sr),hi=Math.round(11000*N/sr);
+  const AX=aux||[],Nad=Float64Array.from(np.prof),AO=AX.map(()=>new Float32Array(n+N)),ARe=new Float64Array(N),AIm=new Float64Array(N),Gp=new Float64Array(nb).fill(1),Xp=new Float64Array(nb),out=chs.map(()=>new Float32Array(n+N)),Re=chs.map(()=>new Float64Array(N)),Im=chs.map(()=>new Float64Array(N)),p=new Float64Array(nb),G=new Float64Array(nb);let gate=1,hold=0;const Ps=new Float64Array(nb),U=Math.max(8,Math.round(.19*sr/H)),D=8,ring=Array.from({length:D},()=>new Float64Array(nb).fill(1e30)),cur=new Float64Array(nb).fill(1e30);let fi=0,ri=0;
+  for(let s=-N+H;s<n;s+=H){
+    for(let c=0;c<C;c++){const d=chs[c],re=Re[c],im=Im[c];for(let i=0;i<N;i++){const t=s+i;re[i]=(t>=0&&t<n?d[t]:0)*w[i];im[i]=0}fft(re,im)}
+    for(let q=0;q<nb;q++){let v=0;for(let c=0;c<C;c++)v+=Re[c][q]*Re[c][q]+Im[c][q]*Im[c][q];p[q]=v/C;Ps[q]=fi?.8*Ps[q]+.2*p[q]:p[q];if(Ps[q]<cur[q])cur[q]=Ps[q]}
+    /* minimum tracking over the last ~1.5 s: noise that swells (car, plane, wind) is followed, speech is not, because speech always has tiny gaps */
+    if(++fi%U===0){ring[ri].set(cur);ri=(ri+1)%D;cur.fill(1e30)}
+    let sp=0,sn=0;for(let q=0;q<nb;q++){let m=cur[q];for(let r=0;r<D;r++)if(ring[r][q]<m)m=ring[r][q];if(m>1e29)m=np.prof[q];Nad[q]=Math.max(np.prof[q],m*1.9);if(q>=b0&&q<=b1){sp+=p[q];sn+=Nad[q]}}
+    const bs=sp/(sn+1e-20),speech=bs>3.2;
+    if(speech){gate=Math.min(1,gate+.5);hold=6}else if(hold>0)hold--;else gate=Math.max(gateFloor,gate-.08);
+    for(let q=0;q<nb;q++){const g=p[q]/(Nad[q]+1e-20),xi=alpha*Xp[q]+(1-alpha)*Math.max(g-1,0);let v=xi/(xi+over);if(q<lo||q>hi)v*=1-.7*k;G[q]=v}
+    for(let q=0;q<nb;q++){const a=G[Math.max(0,q-1)],b=G[q],c2=G[Math.min(nb-1,q+1)];let v=(a+2*b+c2)/4*gate;v=Math.max(floor,v);v=v>Gp[q]?v:.55*v+.45*Gp[q];Xp[q]=v*v*(p[q]/(Nad[q]+1e-20));Gp[q]=v}
+    for(let c=0;c<C;c++){const re=Re[c],im=Im[c];for(let q=0;q<nb;q++){re[q]*=Gp[q];im[q]*=Gp[q]}for(let q=nb;q<N;q++){re[q]=re[N-q];im[q]=-im[N-q]}
+      for(let q=0;q<N;q++)im[q]=-im[q];fft(re,im);const o=out[c];for(let i=0;i<N;i++){const t=s+i;if(t>=0&&t<n)o[t]+=re[i]/N*w[i]/1.5}}
+    for(let a=0;a<AX.length;a++){const d=AX[a];for(let i=0;i<N;i++){const t=s+i;ARe[i]=(t>=0&&t<n?d[t]:0)*w[i];AIm[i]=0}fft(ARe,AIm);for(let q=0;q<nb;q++){ARe[q]*=Gp[q];AIm[q]*=Gp[q]}for(let q=nb;q<N;q++){ARe[q]=ARe[N-q];AIm[q]=-AIm[N-q]}for(let q=0;q<N;q++)AIm[q]=-AIm[q];fft(ARe,AIm);for(let i=0;i<N;i++){const t=s+i;if(t>=0&&t<n)AO[a][t]+=ARe[i]/N*w[i]/1.5}}}
+  for(let a=0;a<AX.length;a++)AX[a].set(AO[a].subarray(0,n));
+  for(let c=0;c<C;c++)chs[c].set(out[c].subarray(0,n))}
 /* the whole chain. o: {voice:bool, eq:[4 dB], comp:0..100, lev:dB speech level, mk:makeup dB, ceil:dBFS} */
 function vproc(chs,sr,o){const eq=o.eq||[0,0,0,0];
+  if(o.nr>0&&o.noise){declick(chs,sr,o.nr);denoise(chs,sr,o.nr,o.noise)}
+  if(o.raw)return;
   if(o.voice){for(const d of chs){bqrun(d,bqx('hp',75,.707,0,sr));bqrun(d,bqx('hp',75,.707,0,sr));bqrun(d,bqx('pk',300,1.1,-2.2,sr));bqrun(d,bqx('pk',3000,.9,1.6,sr))}}
   eq.forEach((g,i)=>{if(Math.abs(g)>.05)for(const d of chs)bqrun(d,bqx(EQ_DEF[i].t,EQ_DEF[i].f,EQ_DEF[i].q,g,sr))});
   const s=Math.max(0,Math.min(1,(o.comp||0)/100));
@@ -520,17 +578,23 @@ function vproc(chs,sr,o){const eq=o.eq||[0,0,0,0];
   if(o.ceil!=null){const b={length:chs[0].length,numberOfChannels:chs.length,sampleRate:sr,getChannelData:i=>chs[i]};limit(b,o.ceil)}}
 const lEq=L=>L.eq||[0,0,0,0],lComp=L=>L.comp==null?(L.key==='voice'?60:0):L.comp;
 const lComp2=L=>clamp(lComp(L)+(L.fx==='podcast'?30*(L.amt/100)*(L.p[2]/50-1):0),0,100);
-const needsProc=L=>L.key==='voice'||lComp2(L)>0||lEq(L).some(g=>Math.abs(g)>.05);
+const lNr=L=>L.nr?clamp((L.nri??50)/100,0,1):0,lWd=L=>L.wd??100;
+const needsProc=L=>L.fx==='raw'?lNr(L)>0:lNr(L)>0||L.key==='voice'||lComp2(L)>0||lEq(L).some(g=>Math.abs(g)>.05);
 const VA=new WeakMap();
-async function vAn(L){const tr=S.tr[L.key],comp=lComp2(L),k=(L.key==='voice'?'v':'x')+comp;let m=VA.get(tr);if(!m){m=new Map();VA.set(tr,m)}if(m.has(k))return m.get(k);
+/* noise fingerprint: up to 8 spots across the whole recording, so quiet stretches anywhere are found */
+async function nrProfileFor(key,d){const wl=Math.min(8,d),pos=d<=16?[0]:[.05,.18,.31,.44,.57,.7,.83,.95],parts=[];for(const f of pos){const a=d<=16?0:clamp(d*f-wl/2,0,d-wl);parts.push(await trWin(key,a,a+wl))}
+  const chs=[];for(let c=0;c<parts[0].numberOfChannels;c++){const tot=parts.reduce((s,p)=>s+p.length,0),x=new Float32Array(tot);let o=0;for(const p of parts){x.set(p.getChannelData(c),o);o+=p.length}chs.push(x)}
+  await tick();return nrProfile(chs,parts[0].sampleRate)}
+async function vAn(L){const tr=S.tr[L.key],comp=lComp2(L),k=(L.key==='voice'?'v':'x')+comp;let m=VA.get(tr);if(!m){m=new Map();VA.set(tr,m)}if(m.has(k)){const r=m.get(k);if(!r.noise&&L.nr){if(!tr.__np)tr.__np=await nrProfileFor(L.key,tr.duration);r.noise=tr.__np}return r}
   const d=tr.duration,wl=Math.min(20,d/3),pos=d<=60?[0]:[.2,.5,.8],parts=[];for(const f of pos){const a=d<=60?0:Math.max(0,d*f-wl/2),b=d<=60?d:Math.min(d,a+wl);parts.push(await trWin(L.key,a,b))}
   const chs=[];for(let c=0;c<parts[0].numberOfChannels;c++){const tot=parts.reduce((s,p)=>s+p.length,0),x=new Float32Array(tot);let o=0;for(const p of parts){x.set(p.getChannelData(c),o);o+=p.length}chs.push(x)}
   const sr=parts[0].sampleRate,sl=speechLevel(chs,sr),t=await procAsync(chs.map(x=>Float32Array.from(x)),sr,{voice:L.key==='voice',eq:[0,0,0,0],comp,lev:sl.lev,mk:0,ceil:null});
-  const l2=speechLevel(t,sr).lev,drop=Math.max(0,sl.lev-l2),mk=comp>0?Math.min(6,.7*drop):0,r={lev:sl.lev,mk,ceil:(comp>0||L.key==='voice')?Math.min(-3,l2+mk+10.5):null};m.set(k,r);return r}
+  const l2=speechLevel(t,sr).lev,drop=Math.max(0,sl.lev-l2),mk=comp>0?Math.min(6,.7*drop):0,r={lev:sl.lev,mk,ceil:(comp>0||L.key==='voice'||L.nr)?Math.min(-3,l2+mk+10.5):null};
+  if(L.nr){if(!tr.__np)tr.__np=await nrProfileFor(L.key,d);r.noise=tr.__np}m.set(k,r);return r}
 
 /* the vocal chain runs in a background worker, so sliders and playback never freeze while it works */
 let VW=null,VWid=0;const VWcb=new Map();
-function vWorker(){if(VW!==null)return VW;try{const src=['const EQ_DEF='+JSON.stringify(EQ_DEF)+';','const lin=d=>Math.pow(10,d/20);',bqx,bqrun,'const dbf='+dbf,compress,deess,limit,vproc].map(String).join('\n')+
+function vWorker(){if(VW!==null)return VW;try{const src=['const EQ_DEF='+JSON.stringify(EQ_DEF)+';','const lin=d=>Math.pow(10,d/20);',bqx,bqrun,'const dbf='+dbf,compress,deess,limit,fft,declick,denoise,vproc].map(String).join('\n')+
     '\nonmessage=e=>{const {id,chs,sr,o}=e.data;try{vproc(chs,sr,o);postMessage({id,chs},chs.map(c=>c.buffer))}catch(err){postMessage({id,err:String(err)})}}';
   VW=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));VW.onmessage=e=>{const c=VWcb.get(e.data.id);if(c){VWcb.delete(e.data.id);c(e.data)}};VW.onerror=()=>{for(const c of VWcb.values())c({err:'worker'});VWcb.clear();VW=false}}catch(e){VW=false}return VW}
 async function procAsync(chs,sr,o){const w=vWorker();
@@ -538,7 +602,7 @@ async function procAsync(chs,sr,o){const w=vWorker();
   await tick();vproc(chs,sr,o);return chs}
 /* recently processed pieces are kept, so changing another layer does not redo the voice */
 const PC=new Map(),trIds=new WeakMap();let trN=0;const trId=t=>{if(!trIds.has(t))trIds.set(t,++trN);return trIds.get(t)};
-async function procSeg(L,off,dur){const A=await vAn(L),P=Math.min(off,2.5),o={voice:L.key==='voice',eq:lEq(L),comp:lComp2(L),lev:A.lev,mk:A.mk,ceil:A.ceil},key=[trId(S.tr[L.key]),L.key,off.toFixed(3),dur.toFixed(3),JSON.stringify(o)].join('|');
+async function procSeg(L,off,dur){const A=await vAn(L),P=Math.min(off,2.5),o={raw:L.fx==='raw',voice:L.key==='voice',eq:lEq(L),comp:lComp2(L),lev:A.lev,mk:A.mk,ceil:A.ceil,nr:lNr(L)},key=[trId(S.tr[L.key]),L.key,off.toFixed(3),dur.toFixed(3),JSON.stringify(o)].join('|');if(o.nr>0)o.noise=A.noise;
   let seg=PC.get(key);if(seg){PC.delete(key);PC.set(key,seg);return{seg,P}}
   const raw=await trWin(L.key,off-P,off+dur+.02),chs=[];for(let q=0;q<raw.numberOfChannels;q++)chs.push(Float32Array.from(raw.getChannelData(q)));
   const out=await procAsync(chs,raw.sampleRate,o);seg=new AudioBuffer({length:out[0].length,numberOfChannels:out.length,sampleRate:raw.sampleRate});out.forEach((c,i)=>seg.copyToChannel(c,i));
@@ -574,13 +638,23 @@ function buildFx(ctx,L,inp,from,len){const k=L.amt/100,f=L.p.map(v=>v/50),out=ct
     if(!L.extra)inp.connect(out);inp.connect(d);d.connect(lp);lp.connect(fb);fb.connect(d);lp.connect(wg);wg.connect(out)}
   else inp.connect(out);
   return out}
+/* stereo width: mid/side. 0 = mono, 1 = as recorded, 2 = widest. Above 1 a delayed, bass-free copy of the centre is added to the sides,
+   so even a mono voice can spread out. The mono sum never changes, so it stays safe on phone speakers */
+function widthNode(ctx,inp,w){const g=v=>{const x=ctx.createGain();x.gain.value=v;x.channelCount=1;x.channelCountMode='explicit';return x};
+  const up=ctx.createGain();up.channelCount=2;up.channelCountMode='explicit';up.channelInterpretation='speakers';inp.connect(up);
+  const sp=ctx.createChannelSplitter(2),mg=ctx.createChannelMerger(2);up.connect(sp);
+  const mid=g(1),side=g(1),a=g(.5),b=g(.5),c=g(.5),d=g(-.5);sp.connect(a,0);sp.connect(b,1);sp.connect(c,0);sp.connect(d,1);a.connect(mid);b.connect(mid);c.connect(side);d.connect(side);
+  const sOut=g(1),sw=g(Math.min(w,2));side.connect(sw);sw.connect(sOut);
+  if(w>1){const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=300;const dl=ctx.createDelay(.05);dl.delayTime.value=.013;const dk=g((w-1)*.7);mid.connect(hp);hp.connect(dl);dl.connect(dk);dk.connect(sOut)}
+  const inv=g(-1);mid.connect(mg,0,0);mid.connect(mg,0,1);sOut.connect(mg,0,0);sOut.connect(inv);inv.connect(mg,0,1);return mg}
 async function renderMix(o){const from=o.from??0,to=o.to??S.total,len=Math.max(.2,to-from),raw=!!o.raw,lanes=o.lanes||S.lanes,anySolo=lanes.some(l=>l.solo);
   const tailFx=!raw&&lanes.some(L=>L.fx==='reverb'||L.fx==='delay')?3.5:.3,ctx=new OfflineAudioContext(2,Math.ceil((len+tailFx)*SR),SR),out=ctx.createGain();
   if(raw||o.noMaster)out.connect(ctx.destination);else{const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=32;hp.Q.value=.7;const cp=ctx.createDynamicsCompressor();cp.threshold.value=-20;cp.knee.value=12;cp.ratio.value=2;cp.attack.value=.03;cp.release.value=.3;out.connect(hp);hp.connect(cp);cp.connect(ctx.destination)}
   const act=raw||o.audition?null:voiceAct(from,to);
   for(const L of lanes){if(L.mute||(anySolo&&!L.solo))continue;if(o.filter&&!o.filter(L))continue;const buf=S.tr[L.key];if(!buf)continue;
-    const fxIn=ctx.createGain(),fxOut=raw||L.fx==='none'?fxIn:buildFx(ctx,L,fxIn,from,len),lg=ctx.createGain();lg.gain.value=raw?1:lin(eff(L).vol);fxOut.connect(lg);let last=lg;
+    const fxIn=ctx.createGain(),fxOut=raw||L.fx==='none'||L.fx==='raw'?fxIn:buildFx(ctx,L,fxIn,from,len),lg=ctx.createGain();lg.gain.value=raw?1:lin(eff(L).vol);fxOut.connect(lg);let last=lg;
     if(!raw&&L.key!=='voice'&&L.dip<0){const de=Math.min(0,eff(L).dip+S.bgOff),dg=ctx.createGain(),cv=new Float32Array(act.length);for(let i=0;i<act.length;i++)cv[i]=lin(de*act[i]);dg.gain.setValueCurveAtTime(cv,0,(act.length-1)*.05);lg.connect(dg);last=dg}
+    if(!raw&&lWd(L)!==100)last=widthNode(ctx,last,lWd(L)/100);
     last.connect(out);
     for(const c of L.clips){const dur0=c.out-c.in,cs=c.start-from,ce=cs+dur0;if(ce<=.001||cs>=len)continue;const t0=Math.max(0,cs),t1=Math.min(len,ce),dur=t1-t0,off=c.in+(t0-cs);if(dur<.01)continue;
       const s0=ctx.createBufferSource();let wb=null,so=off;
@@ -717,7 +791,8 @@ async function setLayer(k,file){if(!file)return;const el=$('lc-'+k),fn=el.queryS
     if(S.built)$('rebuildhint').textContent='New file added. Press Build first mix again to use it. This resets your Trim and Mix edits.'}
   catch(e){fn.textContent=e.message==='long ref'?'Reference must be under '+Math.round(REF_MAX/60)+' minutes.':e.message==='format'?'This long file needs to be WAV, MP3 or M4A.':'Could not read this file. Try WAV, MP3 or M4A.'}
   ready()}
-function ready(){$('build').disabled=!S.src.voice||S.phase==='building';$('build').textContent=S.built?'Rebuild first mix':'Build first mix'}
+const anySrc=()=>KEYS.some(k=>S.src[k]);
+function ready(){$('build').disabled=!anySrc()||S.phase==='building';$('build').textContent=S.built?'Rebuild first mix':'Build first mix'}
 
 /* ============ navigation ============ */
 const TABS={'s-load':'load','s-busy':'load','s-trim':'trim','s-mix':'mix','s-check':'check','s-run':'run','s-done':'run','s-empty':null};
@@ -731,14 +806,14 @@ function go(tab){S.tabNow=tab;stopPlay();updBtns();
 document.querySelectorAll('.steps button').forEach(b=>b.onclick=()=>go(b.dataset.go));
 
 /* ============ build ============ */
-$('build').onclick=async()=>{$('err1').textContent='';$('rebuildhint').textContent='';S.phase='building';ready();show('s-busy');prog(.05,'Trimming the voice');await tick();
+$('build').onclick=async()=>{$('err1').textContent='';$('rebuildhint').textContent='';S.phase='building';ready();show('s-busy');prog(.05,S.src.voice?'Trimming the voice':'Laying out your audio');await tick();
   try{for(const k in PF)saveFileBlob(k,PF[k]);MH.length=0;S.tp={};S.mset=false;S.hist={};S.tr={};S.lanes=[];S.nid=1;S.sel=null;S.playhead=0;S.eq=null;S.W=null;S.R=null;S.win.start=null;
     for(const k of KEYS)if(S.src[k])S.edl[k]=[[0,S.src[k].buf.duration]];
-    const at=autoTrim(S.src.voice.buf,popts());S.edl.voice=at.edl;
+    if(S.src.voice){const at=autoTrim(S.src.voice.buf,popts());S.edl.voice=at.edl}
     for(const k of KEYS)if(S.src[k])S.tr[k]=mkTr(k);
-    S.lead=S.src.music?3:.5;S.tail=S.src.music||S.src.atmos?4:1;
+    S.lead=!S.src.voice?0:S.src.music?3:.5;S.tail=!S.src.voice?0:S.src.music||S.src.atmos?4:1;
     for(const k of KEYS)if(S.tr[k])S.lanes.push(mkLane(k));S.lanes.forEach(layout);updTotal();
-    S.built=true;S.trimKey='voice';S.tsel=null;S.tph=0;S.dirty=true;S.phase='ready';if(S.pending){const pp=S.pending;S.pending=null;applyPreset(pp)}prog(.4,'Mixing a test clip');await tick();
+    S.built=true;S.trimKey=S.src.voice?'voice':KEYS.find(k=>S.src[k]);S.tsel=null;S.tph=0;S.dirty=true;S.phase='ready';if(S.pending){const pp=S.pending;S.pending=null;applyPreset(pp)}prog(.4,'Mixing a test clip');await tick();
     renderAddSrc();renderLanes();ready();prog(.5,'Mixing a test clip');await tick();show('s-check');checkEnter()}
   catch(e){S.phase='idle';S.built=false;ready();show('s-load');$('err1').textContent='Could not build the mix: '+e.message}};
 
@@ -830,7 +905,7 @@ $('t-pl').onclick=()=>pstep(-1);$('t-pr').onclick=()=>pstep(1);
 $('t-sel').onclick=()=>{T.selMode=!T.selMode;$('t-sel').classList.toggle('on',T.selMode);if(!T.selMode)S.tsel=null;trimDraw();trimInfo()};
 /* effect: picking it or moving the slider plays it straight away */
 function fxPanel(){const k=S.trimKey,L=S.lanes.find(l=>l.key===k)||{fx:'none',amt:50};
-  $('fx-sel').innerHTML=Object.keys(FXN).map(f=>`<option value="${f}"${f===L.fx?' selected':''}>${FXN[f]}</option>`).join('');$('fx-amt-row').hidden=L.fx==='none';$('fx-amt').value=L.amt}
+  $('fx-sel').innerHTML=Object.keys(FXN).map(f=>`<option value="${f}"${f===L.fx?' selected':''}>${FXN[f]}</option>`).join('');$('fx-amt-row').hidden=L.fx==='none'||L.fx==='raw';$('fx-amt').value=L.amt}
 let ft=null;function fxChanged(now){S.dirty=true;S.duckDirty=true;renderLanes();clearTimeout(ft);ft=setTimeout(()=>hear(S.trimKey,srcToEd(S.trimKey,S.tph),6),now?60:350)}
 $('fx-sel').onchange=e=>{const L=prim(S.trimKey),v=e.target.value;if(v!=='none')L.amt=v==='podcast'?55:60;L.fx=v;L.p=[50,50,50];fxPanel();fxChanged(true)};
 $('fx-amt').oninput=e=>{prim(S.trimKey).amt=+e.target.value;fxChanged()};
@@ -844,7 +919,7 @@ const popts=()=>({...S.trimOpt,maxPause:PMODES[S.pauseMode].maxPause,keep:PMODES
 function pmUI(){$('pmodes').innerHTML=['orig','off','medium','tight'].map(m=>`<button class="chip${m===S.pauseMode?' on':''}" data-m="${m}">${PMODES[m].n}</button>`).join('');
   $('pmhint').textContent=PMODES[S.pauseMode].d+(S.tsel?' Applies to the part you selected.':' Applies to the whole recording. To change one part only, tap Select, drag across it, then choose.');
   $('pmodes').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.pauseMode=b.dataset.m;applyPause()})}
-function applyPause(){const k='voice',cur=S.edl[k],r=autoTrim(S.src.voice.buf,popts());let edl,msg;
+function applyPause(){if(!S.src.voice)return;const k='voice',cur=S.edl[k],r=autoTrim(S.src.voice.buf,popts());let edl,msg;
   if(S.tsel&&S.tsel[1]-S.tsel[0]>=.3){const a=S.tsel[0],b=S.tsel[1];edl=S.pauseMode==='orig'?norm([...cutR(cur,a,b),[a,b]]):norm([...cutR(cur,a,b),...keepR(r.edl,a,b)]);msg=`${PMODES[S.pauseMode].n} applied to the selected part`}
   else{edl=r.edl;msg=`${PMODES[S.pauseMode].n} applied to the whole recording`+(S.pauseMode==='orig'||S.pauseMode==='off'?'':` · ${r.cuts} pause${r.cuts===1?'':'s'} shortened`)}
   commit(k,edl);pmUI();$('tinfo').textContent+=' · '+msg}
@@ -946,11 +1021,23 @@ function renderLanes(){const box=$('lanes');box.innerHTML='';
   S.lanes.forEach(L=>{const d=document.createElement('div');d.className='lane'+(L.mute?' off':'');d.dataset.id=L.id;d.style.setProperty('--lc','var(--'+L.key+')');
     const pr=FXP[L.fx];
     d.innerHTML=`<div class="lh2"><b>${L.name}${L.fx!=='none'?' · '+FXN[L.fx]:''}</b><button data-b="mute" class="${L.mute?'on':''}" title="Mute">M</button><button data-b="solo" class="${L.solo?'on':''}" title="Solo">S</button><button data-b="del" title="Remove layer">✕</button></div>
-    <div class="fxrow"><select data-a="fx" aria-label="Effect">${Object.keys(FXN).map(f=>`<option value="${f}"${f===L.fx?' selected':''}>${FXN[f]}</option>`).join('')}</select>${L.fx!=='none'?slh('Amount','amt',0,100,L.amt,v=>v+'%'):''}</div>
+    <div class="fxrow"><select data-a="fx" aria-label="Effect">${Object.keys(FXN).map(f=>`<option value="${f}"${f===L.fx?' selected':''}>${FXN[f]}</option>`).join('')}</select>${L.fx!=='none'&&L.fx!=='raw'?slh('Amount','amt',0,100,L.amt,v=>v+'%'):''}</div>
     ${slh('Level','vol',-40,6,Math.round(L.vol),v=>v+' dB')}
     ${L.key!=='voice'?slh('Dip under voice','dip',-20,0,Math.round(L.dip),v=>v+' dB'):''}
+    <div class="wrow"><div class="wd"><svg class="wdial" viewBox="0 0 80 80" role="slider" aria-label="Stereo width" aria-valuemin="0" aria-valuemax="200" aria-valuenow="${lWd(L)}">${wdSvg(lWd(L),COL[L.key])}</svg><div class="wdl"><span>Width</span><output>${wdTxt(lWd(L))}</output></div></div>
+    <div class="nrbox"><div class="nrh"><span>Noise clean</span><button class="sw${L.nr?' on':''}" data-b="nr" role="switch" aria-checked="${!!L.nr}" title="Noise clean on/off"><i></i></button></div>${fdHtml(L)}</div></div>
     <details${S.eqOpen&&S.eqOpen[L.id]?' open':''} data-id="${L.id}"><summary>Fine tune · EQ and compressor</summary><div><canvas class="eqc" aria-label="Equaliser. Drag the four dots up or down"></canvas><div class="hint eqv">${eqTxt(L)}</div>${EQN.map((n,i)=>slh(n,'eq'+i,-12,12,lEq(L)[i],v=>(v>0?'+':'')+v+' dB')).join('')}<button data-b="eqreset" class="sm">Reset EQ</button>${slh('Compressor','comp',0,100,lComp(L),v=>v+'%')}${pr?pr.map((n,i)=>slh(n,'p'+i,0,100,L.p[i],v=>v+'%')).join(''):''}</div></details>`;box.appendChild(d)});
-  box.querySelectorAll('.eqc').forEach(cv=>eqDraw(cv,lane(cv.closest('.lane').dataset.id)))}
+  box.querySelectorAll('.eqc').forEach(cv=>eqDraw(cv,lane(cv.closest('.lane').dataset.id)));box.querySelectorAll('.fd').forEach(fd=>fdPaint(fd,lane(fd.closest('.lane').dataset.id).nri??50))}
+/* width dial: base ring always shown; the inner circle grows from a dot (mono) to the ring (widest) */
+const wdTxt=v=>v<=0?'Mono':v===100?'As recorded':v<100?'Narrow '+v+'%':'Wide '+v+'%';
+function wdSvg(v,col){const th=(-135+270*v/200)*Math.PI/180,P=(r,t)=>[40+r*Math.sin(t),40-r*Math.cos(t)],R=32,t0=-135*Math.PI/180,[x0,y0]=P(R,t0),[x1,y1]=P(R,th),[x2,y2]=P(R,135*Math.PI/180),big=(th-t0)>Math.PI?1:0,ir=Math.max(2.5,26*v/200),[kx,ky]=P(R,th);
+  return `<circle cx="40" cy="40" r="${R}" fill="#121314" stroke="#2e3034" stroke-width="5"/><path d="M${x0} ${y0}A${R} ${R} 0 1 1 ${x2} ${y2}" fill="none" stroke="#25272b" stroke-width="5" stroke-linecap="round"/>`+
+    (v>0?`<path d="M${x0} ${y0}A${R} ${R} 0 ${big} 1 ${x1} ${y1}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round"/>`:'')+
+    `<circle cx="40" cy="40" r="26" fill="none" stroke="#3a3e44" stroke-width="1" stroke-dasharray="2 3"/><circle cx="40" cy="40" r="${ir}" fill="${col}" fill-opacity=".28" stroke="${col}" stroke-width="2"/><circle cx="${kx}" cy="${ky}" r="5" fill="#fff"/>`}
+const fdHtml=L=>{const v=L.nri??50;return `<div class="fd${L.nr?'':' off'}"><div class="fdt" role="slider" aria-label="Noise clean intensity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${v}"><div class="fdf"></div><div class="fdk"></div></div><output>${v}</output></div>`};
+const TCH=matchMedia('(pointer:coarse)').matches;if(TCH)document.documentElement.classList.add('tch');
+function fdPaint(fd,v){const vert=TCH,f=fd.querySelector('.fdf'),k=fd.querySelector('.fdk');
+  if(vert){f.style.height=v+'%';f.style.width='';k.style.bottom=v+'%';k.style.left='';}else{f.style.width=v+'%';f.style.height='';k.style.left=v+'%';k.style.bottom=''}fd.querySelector('output').textContent=v}
 const EQN=['Low','Low mid','Presence','High'],eqTxt=L=>lEq(L).map((v,i)=>EQN[i]+' '+(v>0?'+':'')+v).join(' · ')+' dB';
 function eqDraw(cv,L){const w=cv.clientWidth||300,h=120,g=fit(cv,w,h),eq=lEq(L),X=f=>Math.log(f/20)/Math.log(1000)*(w-16)+8,Y=d=>h/2-d/14*(h/2-10);
   g.fillStyle='#0e0f10';g.fillRect(0,0,w,h);g.lineWidth=1;g.strokeStyle='#23262a';for(const f of [50,100,200,500,1000,2000,5000,10000]){const x=X(f);g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke()}
@@ -958,6 +1045,16 @@ function eqDraw(cv,L){const w=cv.clientWidth||300,h=120,g=fit(cv,w,h),eq=lEq(L),
   for(let i=0;i<=120;i++){const f=20*Math.pow(1000,i/120),x=X(f),y=Y(clamp(eqMag(f,eq,SR),-14,14));i?g.lineTo(x,y):g.moveTo(x,y)}g.stroke();
   eq.forEach((v,i)=>{const x=X(EQ_DEF[i].f),y=Y(v);g.fillStyle='#fff';g.beginPath();g.arc(x,y,8,0,7);g.fill();g.fillStyle=COL[L.key];g.beginPath();g.arc(x,y,5,0,7);g.fill()});
   g.fillStyle='#8a8f98';g.font='10px "IBM Plex Mono",monospace';g.fillText('100',X(100)-8,h-3);g.fillText('1k',X(1000)-5,h-3);g.fillText('10k',X(10000)-8,h-3)}
+let wdd=null,fdd=null;
+function wdSet(e){if(wdd.x0==null){wdd.x0=e.clientX;wdd.y0=e.clientY;wdd.s0=wdd.v;return}const d=(e.clientX-wdd.x0)-(e.clientY-wdd.y0),v=clamp(Math.round((wdd.s0+d/38*100)/5)*5,0,200);if(v===wdd.v)return;wdd.v=v;wdd.L.wd=v;wdPaint(wdd.svg,wdd.L);S.dirty=true}
+function wdPaint(svg,L){svg.innerHTML=wdSvg(lWd(L),COL[L.key]);svg.setAttribute('aria-valuenow',lWd(L));svg.closest('.wd').querySelector('output').textContent=wdTxt(lWd(L))}
+function fdSet(e){const r=fdd.t.getBoundingClientRect(),vert=TCH,f=vert?(r.bottom-e.clientY)/r.height:(e.clientX-r.left)/r.width,v=Math.round(clamp(f,0,1)*100);fdd.L.nri=v;fdPaint(fdd.fd,v);S.dirty=true}
+$('lanes').addEventListener('pointerdown',e=>{const svg=e.target.closest&&e.target.closest('.wdial');if(svg){const L=lane(svg.closest('.lane').dataset.id);wdd={svg,L,v:lWd(L)};try{svg.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault();wdSet(e);return}
+  const t=e.target.closest&&e.target.closest('.fdt');if(t){const fd=t.closest('.fd'),L=lane(t.closest('.lane').dataset.id);if(!L.nr){L.nr=true;const b=t.closest('.nrbox').querySelector('.sw');b.classList.add('on');b.setAttribute('aria-checked',true);fd.classList.remove('off')}fdd={t,fd,L};try{t.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault();fdSet(e)}});
+document.addEventListener('pointermove',e=>{if(wdd)wdSet(e);if(fdd)fdSet(e)});
+const wfEnd=()=>{if(wdd||fdd){wdd=fdd=null;liveMix(false)}};document.addEventListener('pointerup',wfEnd);document.addEventListener('pointercancel',wfEnd);
+$('lanes').addEventListener('dblclick',e=>{const svg=e.target.closest&&e.target.closest('.wdial');if(!svg)return;const L=lane(svg.closest('.lane').dataset.id);L.wd=100;wdPaint(svg,L);S.dirty=true;liveMix(false)});
+$('lanes').addEventListener('wheel',e=>{const svg=e.target.closest&&e.target.closest('.wdial');if(!svg)return;e.preventDefault();const L=lane(svg.closest('.lane').dataset.id);L.wd=clamp(lWd(L)+(e.deltaY<0?5:-5),0,200);wdPaint(svg,L);S.dirty=true;liveMix(false)},{passive:false});
 let ed=null;
 function eqSet(e){const r=ed.cv.getBoundingClientRect(),h=r.height,v=Math.round(clamp((h/2-(e.clientY-r.top))/(h/2-10)*14,-12,12)*2)/2;ed.L.eq=[...lEq(ed.L)];ed.L.eq[ed.b]=v;eqDraw(ed.cv,ed.L);const o=ed.cv.parentElement.querySelector('.eqv');if(o)o.textContent=eqTxt(ed.L);const sl=ed.cv.parentElement.querySelector(`input[data-a=eq${ed.b}]`);if(sl){sl.value=v;sl.nextElementSibling.textContent=(v>0?'+':'')+v+' dB'}S.dirty=true;liveMix(false)}
 $('lanes').addEventListener('pointerdown',e=>{const cv=e.target.closest&&e.target.closest('.eqc');if(!cv)return;const L=lane(cv.closest('.lane').dataset.id),r=cv.getBoundingClientRect(),w=r.width,x=e.clientX-r.left,X=f=>Math.log(f/20)/Math.log(1000)*(w-16)+8;let b=0,bd=1e9;EQ_DEF.forEach((q,i)=>{const d=Math.abs(X(q.f)-x);if(d<bd){bd=d;b=i}});ed={cv,L,b};try{cv.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault();eqSet(e)});
@@ -969,6 +1066,7 @@ $('lanes').addEventListener('input',e=>{const t=e.target,a=t.dataset.a;if(!a||t.
   const o=t.nextElementSibling;if(o)o.textContent=v+(a==='vol'||a==='dip'?' dB':'%');S.dirty=true;S.duckDirty=true;tlDraw();liveMix(false)});
 $('lanes').addEventListener('change',e=>{const t=e.target;if(t.dataset.a!=='fx')return;const L=lane(t.closest('.lane').dataset.id);if(L.fx==='none'&&t.value!=='none')L.amt=60;L.fx=t.value;L.p=[50,50,50];S.dirty=true;renderLanes();tlDraw();liveMix(true)});
 $('lanes').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!b.dataset.b)return;const L=lane(b.closest('.lane').dataset.id);
+  if(b.dataset.b==='nr'){L.nr=!L.nr;L.nri=L.nri??50;b.classList.toggle('on',L.nr);b.setAttribute('aria-checked',L.nr);b.closest('.nrbox').querySelector('.fd').classList.toggle('off',!L.nr);S.dirty=true;liveMix(false);return}
   if(b.dataset.b==='eqreset'){L.eq=[0,0,0,0];S.dirty=true;renderLanes();liveMix(false);return}
   if(b.dataset.b==='mute')L.mute=!L.mute;else if(b.dataset.b==='solo')L.solo=!L.solo;else{S.lanes=S.lanes.filter(x=>x!==L);S.sel=null;updTotal()}
   S.dirty=true;S.duckDirty=true;renderLanes();mixView();inspect();liveMix(false)});
@@ -1130,7 +1228,7 @@ $('save-mp3').onclick=async()=>{const b=$('save-mp3');b.disabled=true;$('err3').
 let PDB=null,PRESETS=[],PDOC=null;
 const slug=n=>String(n).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)||'mix';
 const phint=t=>{for(const id of ['phint-load','phint-mix'])$(id).textContent=t||''};
-const lanesLite=()=>S.lanes.map(l=>({key:l.key,extra:!!l.extra,name:l.name,fx:l.fx,amt:l.amt,p:[...l.p],vol:l.vol,dip:l.dip,mute:!!l.mute,solo:!!l.solo,eq:[...lEq(l)],comp:lComp(l)}));
+const lanesLite=()=>S.lanes.map(l=>({key:l.key,extra:!!l.extra,name:l.name,fx:l.fx,amt:l.amt,p:[...l.p],vol:l.vol,dip:l.dip,mute:!!l.mute,solo:!!l.solo,eq:[...lEq(l)],comp:lComp(l),wd:lWd(l),nr:!!l.nr,nri:l.nri??50}));
 const fullState=()=>({edl:S.edl,xf:S.xf,lanes:S.lanes,nid:S.nid,lead:S.lead,tail:S.tail,matchAmt:S.matchAmt,bgOff:S.bgOff,snapOn:S.snapOn});
 function presetDoc(name,withFull){const d={name,savedAt:Date.now(),voiceName:S.src.voice?S.src.voice.name:'',voiceDur:S.src.voice?S.src.voice.buf.duration:0,total:S.total,settings:{lanes:lanesLite(),matchAmt:S.matchAmt,bgOff:S.bgOff}};
   if(withFull){const f=fullState();if(JSON.stringify(f).length<200000)d.full=JSON.parse(JSON.stringify(f))}return d}
@@ -1140,16 +1238,16 @@ async function pdbInit(){let loc=[];try{loc=(await DB.get('presets'))||[]}catch(
 async function putPreset(id,doc){if(PDB){await PDB.doc('presets/'+id).set(doc)}else{const l=PRESETS.filter(x=>x.id!==id);PRESETS=[{id,...doc},...l];try{await DB.set('presets',PRESETS)}catch(e){}renderPresets()}}
 async function delPreset(id){if(PDB)await PDB.doc('presets/'+id).delete();else{PRESETS=PRESETS.filter(x=>x.id!==id);try{await DB.set('presets',PRESETS)}catch(e){}renderPresets()}}
 const when=t=>t?new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short'})+' '+new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
-let ACTIVEP=(()=>{try{return localStorage.getItem('four-preset')}catch(e){return null}})();
+let PREV_ST=null,ACTIVEP=(()=>{try{return localStorage.getItem('four-preset')}catch(e){return null}})();
 const setActiveP=id=>{ACTIVEP=id;try{id?localStorage.setItem('four-preset',id):localStorage.removeItem('four-preset')}catch(e){}renderPresets()};
 function renderPresets(){const h=PRESETS.length?PRESETS.map(p=>`<div class="prow" data-id="${p.id}"><div class="pn"><b>${esc(p.name||p.id)}</b><span>${p.auto?'saved automatically · ':''}${when(p.savedAt)}${p.voiceName?' · '+esc(p.voiceName):''}</span></div>${p.id===ACTIVEP?'<button data-p="use" class="pb used" aria-label="In use" title="In use"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3.2 8.4l3 3 6.6-6.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>':'<button data-p="use" class="pb">Use</button>'}<button data-p="del" class="pb x" title="Delete">✕</button></div>`).join(''):'<div class="hint">No presets yet. Mix something, then tap Save preset.</div>';
   $('plist-load').innerHTML=h;$('plist-mix').innerHTML=h}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function applySettings(p){const sl=p.settings.lanes;S.lanes=S.lanes.filter(l=>!l.extra);
   for(const x of sl){if(!S.tr[x.key])continue;let L;if(!x.extra){L=S.lanes.find(l=>l.key===x.key&&!l.extra);if(!L){L=mkLane(x.key);S.lanes.push(L);layout(L)}}else{L=mkLane(x.key,x.fx);L.extra=true;S.lanes.push(L);layout(L)}
-    Object.assign(L,{name:x.name,fx:x.fx,amt:x.amt,p:[...x.p],vol:x.vol,dip:x.dip,mute:!!x.mute,solo:!!x.solo,eq:x.eq?[...x.eq]:[0,0,0,0],comp:x.comp==null?(x.key==='voice'?60:0):x.comp})}
+    Object.assign(L,{name:x.name,fx:x.fx,amt:x.amt,p:[...x.p],vol:x.vol,dip:x.dip,mute:!!x.mute,solo:!!x.solo,eq:x.eq?[...x.eq]:[0,0,0,0],comp:x.comp==null?(x.key==='voice'?60:0):x.comp,wd:x.wd??100,nr:!!x.nr,nri:x.nri??50})}
   if(p.settings.matchAmt!=null)S.matchAmt=p.settings.matchAmt;S.bgOff=p.settings.bgOff||0;updTotal();S.sel=null;S.dirty=true;S.duckDirty=true;renderLanes();renderAddSrc();if(!$('s-mix').hidden){mixView();inspect()}}
-function adoptState(f,tab){f=JSON.parse(JSON.stringify(f));Object.assign(S,{xf:f.xf||S.xf,lanes:f.lanes.filter(l=>S.src[l.key]),nid:f.nid||S.nid,lead:f.lead,tail:f.tail,trimKey:'voice',tph:0,tp:{},mset:false,playhead:0,win:{start:null,len:30},matchAmt:f.matchAmt==null?.6:f.matchAmt,snapOn:f.snapOn!==false,prev:0,hist:{},sel:null,selLane:null,tsel:null,eq:null,W:null,R:null,bgOff:f.bgOff||0,bgAuto:0});
+function adoptState(f,tab){f=JSON.parse(JSON.stringify(f));Object.assign(S,{xf:f.xf||S.xf,lanes:f.lanes.filter(l=>S.src[l.key]),nid:f.nid||S.nid,lead:f.lead,tail:f.tail,trimKey:S.src.voice?'voice':KEYS.find(k=>S.src[k]),tph:0,tp:{},mset:false,playhead:0,win:{start:null,len:30},matchAmt:f.matchAmt==null?.6:f.matchAmt,snapOn:f.snapOn!==false,prev:0,hist:{},sel:null,selLane:null,tsel:null,eq:null,W:null,R:null,bgOff:f.bgOff||0,bgAuto:0});
   for(const k of KEYS)if(S.src[k]){S.edl[k]=(f.edl&&f.edl[k])||[[0,S.src[k].buf.duration]];S.tr[k]=mkTr(k)}
   MH.length=0;S.built=true;S.phase='ready';S.dirty=true;S.duckDirty=true;updTotal();renderAddSrc();renderLanes();ready();if(tab)go(tab)}
 function applyPreset(p){if(!S.built){S.pending=p;phint('“'+p.name+'” is ready. It applies when you press Build first mix.');return}
@@ -1157,7 +1255,12 @@ function applyPreset(p){if(!S.built){S.pending=p;phint('“'+p.name+'” is read
   if(p.full&&p.voiceDur&&Math.abs(p.voiceDur-dur)<1){adoptState(p.full,'mix');phint('Loaded “'+p.name+'” with your cuts and clips.')}
   else{applySettings(p);phint('Applied “'+p.name+'” levels and effects to this recording.');if(!$('s-mix').hidden)liveMix(false)}}
 document.addEventListener('click',e=>{const b=e.target.closest('button[data-p]');if(!b)return;const id=b.closest('.prow').dataset.id,p=PRESETS.find(x=>x.id===id);if(!p)return;
-  if(b.dataset.p==='use'){applyPreset(p);setActiveP(id)}else if(b.dataset.p==='del'){if(b.dataset.arm){delPreset(id).catch(()=>{});phint('')}else{b.dataset.arm=1;b.textContent='Delete?';setTimeout(()=>{b.dataset.arm='';b.textContent='✕'},3000)}}});
+  if(b.dataset.p==='use'){
+    if(id===ACTIVEP){/* tap the gold tick again: no preset. Puts back how things were before it was applied */
+      setActiveP(null);if(S.pending&&S.pending.id===id){S.pending=null;phint('No preset will be used.');return}
+      if(PREV_ST&&S.built){const st=PREV_ST;PREV_ST=null;adoptState(st,null);phint('Removed “'+p.name+'”. Back to how it was before.');if(!$('s-mix').hidden)liveMix(false)}
+      else phint('“'+p.name+'” unticked. Your current settings stay as they are.');return}
+    PREV_ST=S.built?(()=>{try{return JSON.parse(JSON.stringify(fullState()))}catch(_){return null}})():null;applyPreset(p);setActiveP(id)}else if(b.dataset.p==='del'){if(b.dataset.arm){delPreset(id).catch(()=>{});phint('')}else{b.dataset.arm=1;b.textContent='Delete?';setTimeout(()=>{b.dataset.arm='';b.textContent='✕'},3000)}}});
 const pname=()=>($('pname').value.trim()||(S.src.voice?S.src.voice.name.replace(/\.[^.]+$/,''):'My mix'));
 $('psave').onclick=async()=>{if(!S.built){phint('Build your mix first, then save it.');return}const n=pname();try{await putPreset(slug(n),presetDoc(n,true));phint('Saved preset “'+n+'”. '+(window.claude?'It is kept online, so it is here next time.':'It is kept in this browser. Use Save project file for a copy that holds your audio too.'))}catch(e){phint('Could not save the preset: '+(e.message||e.code||'try again'))}};
 let mirT=null;function mirror(){if(!S.built||mirT)return;mirT=setTimeout(()=>{mirT=null;const d=presetDoc('Last session',true);d.auto=true;putPreset("auto-last",d).catch(()=>{})},6000)}
@@ -1174,7 +1277,7 @@ async function readZip(f){const tail=new Uint8Array(await f.slice(Math.max(0,f.s
   for(const x of out){const l=new DataView(await f.slice(x.lo,x.lo+30).arrayBuffer());x.start=x.lo+30+l.getUint16(26,true)+l.getUint16(28,true)}return out}
 $('pproj').onclick=async()=>{if(!S.built){phint('Build your mix first.');return}const b=$('pproj'),o=b.textContent;b.disabled=true;b.textContent='Packing…';await tick();
   try{const n=pname(),files={},list=[];for(const k of [...KEYS,'ref']){const f=PF[k];if(!f||!S.src[k])continue;const entry='audio/'+k+'_'+S.src[k].name;files[k]={name:S.src[k].name,entry,type:f.type||''};list.push({name:entry,blob:f})}
-    const meta={format:'four-project',v:1,name:n,savedAt:Date.now(),files,full:fullState(),settings:presetDoc(n,false).settings,voiceDur:S.src.voice.buf.duration};
+    const meta={format:'four-project',v:1,name:n,savedAt:Date.now(),files,full:fullState(),settings:presetDoc(n,false).settings,voiceDur:S.src.voice?S.src.voice.buf.duration:0};
     list.unshift({name:'project.json',blob:new Blob([JSON.stringify(meta)],{type:'application/json'})});const z=await zipMany(list);
     let dl=null;try{dl=await window.claude?.use?.('downloads')}catch(e){}const pn=n.replace(/[\\/:*?"<>|]/g,'')+' · FOUR project.zip';let r=true;if(dl)await dl.save({filename:pn,data:z});else r=await directDownload(pn,z,'phint-mix');
     if(r!==null&&r!=='')phint('Project saved. Keep that zip in Files. To bring it all back, tap Open a saved project on the Load tab.')}
@@ -1183,7 +1286,7 @@ $('proj-in').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!
   try{const ents=await readZip(f),pj=ents.find(x=>x.name==='project.json');if(!pj||pj.comp)throw new Error('This is not a FOUR project zip.');const meta=JSON.parse(await f.slice(pj.start,pj.start+pj.size).text());if(meta.format!=='four-project')throw new Error('This is not a FOUR project zip.');
     if(S.phase==='running'||S.phase==='building')throw new Error('Wait for the current job to finish first.');if(S.built||Object.keys(S.src).length)resetAll();
     for(const [k,fi] of Object.entries(meta.files)){const x=ents.find(q=>q.name===fi.entry);if(!x||x.comp)continue;phint('Reading '+fi.name+'…');await setLayer(k,new File([f.slice(x.start,x.start+x.size)],fi.name,{type:fi.type||''}))}
-    if(!S.src.voice)throw new Error('The voice file is missing from this project.');adoptState(meta.full,'mix');phint('Project opened: your files, cuts and mix are back.')}
+    if(!anySrc())throw new Error('The audio files are missing from this project.');adoptState(meta.full,'mix');phint('Project opened: your files, cuts and mix are back.')}
   catch(err){phint('Could not open that file: '+(err.message||'try again'))}};
 
 /* ============ reset ============ */
@@ -1229,7 +1332,7 @@ async function restoreInner(){S.phase='restoring';let st=null;const files={};
       else{const m=k==='ref'?null:await probeFile(fl);if(m&&m.dur>LONG_MIN)buf=await analyzeLong(fl,m,p=>prog(.1+.6*((i+p)/ks.length),'Reading your long recording'));else buf=await dc().decodeAudioData(await fl.arrayBuffer())}
       S.src[k]={name:files[k].name,buf};PF[k]=fl;cardSet(k,files[k].name,buf);prog(.1+.6*(++i/ks.length),'Restoring your session');await tick()}
     S.phase='idle';
-    if(st&&st.built&&S.src.voice){
+    if(st&&st.built&&anySrc()){
       Object.assign(S,{xf:st.xf,lanes:st.lanes,nid:st.nid,lead:st.lead,tail:st.tail,trimKey:st.trimKey,tph:st.tph||0,tp:st.tp||{},pps:st.pps||30,mset:!!st.mset,playhead:st.playhead||0,win:st.win||S.win,matchAmt:st.matchAmt==null?.6:st.matchAmt,snapOn:st.snapOn!==false,prev:st.prev||0});
       for(const k of KEYS)if(S.src[k]){S.edl[k]=(st.edl&&st.edl[k])||[[0,S.src[k].buf.duration]];S.tr[k]=mkTr(k)}
       if(st.pm&&PMODES[st.pm])S.pauseMode=st.pm;S.built=true;S.phase='ready';S.dirty=true;S.duckDirty=true;updTotal();renderAddSrc();renderLanes();ready();prog(.9,'Restoring your session');await tick();
